@@ -1,0 +1,22 @@
+<main class="landing">
+  <section class="landing-card">
+    <p class="eyebrow">Assignment Starter</p>
+    <h1>{{ title }}</h1>
+    <p class="subtitle">{{ subtitle }}</p>
+
+    <div class="actions">
+      <button type="button" class="primary">Get Started</button>
+      <button type="button" class="secondary">Login</button>
+    </div>
+
+    <p class="firebase-note">
+      {{
+        firebaseConfigured
+          ? "Firebase config detected."
+          : "Firebase config is missing."
+      }}
+    </p>
+
+    <p class="firebase-note">{{ firestoreStatusMessage }}</p>
+  </section>
+</main>
