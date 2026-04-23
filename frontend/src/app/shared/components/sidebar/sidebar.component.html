@@ -1,0 +1,21 @@
+<aside class="sidebar">
+  <div class="brand">AI Coach</div>
+  <a
+    class="section-link"
+    [class.active]="activeItem === 'interview-session'"
+    [routerLink]="interviewSessionRoute"
+  >
+    Interview Session
+  </a>
+
+  <nav class="nav-list" aria-label="Dashboard navigation">
+    <a
+      *ngFor="let item of navItems"
+      class="nav-item"
+      [class.active]="activeItem === item.key"
+      [routerLink]="item.route"
+    >
+      {{ item.label }}
+    </a>
+  </nav>
+</aside>
