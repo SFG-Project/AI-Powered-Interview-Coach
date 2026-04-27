@@ -1,11 +1,111 @@
-<main class="placeholder-page">
-  <app-sidebar [activeItem]="'interview-session'"></app-sidebar>
+<div class="app">
+  <aside class="sidebar">
+    <div>
+      <div class="logo">AI Coach</div>
+      <nav class="menu">
+        <a href="#" class="nav-link active" data-page="interview">Interview Session</a>
+        <a href="#" class="nav-link" data-page="dashboard">Dashboard</a>
+        <a href="#" class="nav-link" data-page="progress">Progress</a>
+        <a href="#" class="nav-link" data-page="reports">Feedback Reports</a>
+        <a href="#" class="nav-link" data-page="settings">Settings</a>
+      </nav>
+    </div>
+    <div class="sidebar-footer">
+      AI-Powered Adaptive Interview Coach
+    </div>
+  </aside>
 
-  <section class="placeholder-content">
-    <h1>Interview Session</h1>
+  <main class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">Interview Session</h1>
+      <div class="profile">
+        <div class="avatar">R</div>
+        <span>Rorisang</span>
+      </div>
+    </div>
 
-    <article class="placeholder-card">
-      <p>This page is under construction.</p>
-    </article>
-  </section>
-</main>
+    <!-- Interview Session -->
+    <section class="page active" id="interview">
+      <div class="grid-2">
+        <div class="chat-box">
+          <div class="chat-header">
+            <h2>AI Interview Session</h2>
+            <p class="muted">Role: Software Developer | Type: Technical | Question {{ currentQuestionIndex }} of {{ totalQuestions }}</p>
+            <div class="progress-bar">
+              <div class="progress-fill" [style.width.%]="getProgressPercentage()"></div>
+            </div>
+          </div>
+
+          <div class="messages" #chatMessages>
+            @for (message of messages; track $index) {
+              @if (message.type === 'ai') {
+                <div class="message-row ai">
+                  <div class="bubble">{{ message.content }}</div>
+                </div>
+              } @else if (message.type === 'user') {
+                <div class="message-row user">
+                  <div class="bubble">{{ message.content }}</div>
+                </div>
+              }
+            }
+            
+            @if (isTyping) {
+              <div class="typing">AI is typing...</div>
+            }
+          </div>
+
+          <div class="input-area">
+            <div class="input-row">
+              <button class="mic-btn" [class.recording]="isRecording" (click)="startVoiceInput()" [disabled]="!isInterviewActive">🎤</button>
+              <input type="text" id="userInput" [value]="userAnswer" (input)="updateUserAnswer($event)" (keyup.enter)="sendMessage()" placeholder="Type your answer here..." [disabled]="!isInterviewActive" />
+              
+              @if (!isRecording) {
+                <button class="send-btn" (click)="sendMessage()" [disabled]="!isInterviewActive || !userAnswer.trim()">Send</button>
+              } @else {
+                <button class="send-btn recording-btn" (click)="stopRecordingAndSend()" [disabled]="!isInterviewActive">Stop & Send</button>
+              }
+            </div>
+
+            @if (isRecording) {
+              <div class="recording-indicator">
+                <span class="recording-pulse"></span>
+                <span>🔴 Recording... Click Stop & Send when done</span>
+              </div>
+            }
+
+            <div class="action-row">
+              <div class="timer">⏱ Time Left: {{ formatTime() }}</div>
+              <div class="actions">
+                <button class="btn btn-warning" (click)="togglePause()" [disabled]="isRecording">{{ isPaused ? 'Resume' : 'Pause' }}</button>
+                <button class="btn btn-success" (click)="skipQuestion()" [disabled]="!isInterviewActive || isRecording">Next Question</button>
+                <button class="btn btn-danger" (click)="endInterview()" [disabled]="isRecording">End Interview</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <h3>Live Tips</h3>
+            <p class="muted">Answer using definition + explanation + example.</p>
+          </div>
+
+          <div class="card">
+            <h3>Evaluation Areas</h3>
+            <div class="skill-list">
+              <div class="skill-item"><span>Clarity</span><span class="tag">Good</span></div>
+              <div class="skill-item"><span>Technical Accuracy</span><span class="tag">Strong</span></div>
+              <div class="skill-item"><span>Confidence</span><span class="tag">Moderate</span></div>
+              <div class="skill-item"><span>Communication</span><span class="tag">Improving</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Session Notes</h3>
+            <p class="muted">Keep answers direct. Add practical examples. Avoid being too short.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
