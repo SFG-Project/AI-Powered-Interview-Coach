@@ -20,9 +20,26 @@ export interface SignUpPayload {
 @Injectable({ providedIn: "root" })
 export class AuthService {
   private readonly userProfileService = inject(UserProfileService);
+  private tokenKey = 'authToken';
 
   async signIn(email: string, password: string): Promise<void> {
-    await signInWithEmailAndPassword(firebaseAuth, email, password);
+    const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+    const idToken = await userCredential.user.getIdToken();
+
+    // Save Firebase ID token locally
+    sessionStorage.setItem(this.tokenKey, idToken);
+  }
+
+  getToken(): string | null {
+    return sessionStorage.getItem(this.tokenKey);
+  }
+
+  logout(): void {
+    sessionStorage.removeItem(this.tokenKey);
+  }
+
+  isAuthenticated(): boolean {
+    return !!sessionStorage.getItem(this.tokenKey);
   }
 
   async signUp(payload: SignUpPayload): Promise<void> {
@@ -110,4 +127,5 @@ export class AuthService {
 
     return undefined;
   }
+
 }
