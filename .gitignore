@@ -4,6 +4,14 @@ backend/node_modules/
 frontend/dist/
 frontend/.angular/
 backend/.env
+.env
+.env.local
+.env.development
+.env.production
+frontend/.env
+firebase-service-account.json
+serviceAccountKey.json
+*service-account*.json
 *.log
 .DS_Store
 Thumbs.db
