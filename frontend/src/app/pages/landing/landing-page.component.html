@@ -29,5 +29,14 @@
         <p>{{ stat.label }}</p>
       </article>
     </section>
+
+    <p class="status-note">
+      {{
+        backendApiConfigured
+          ? "Backend API URL configured."
+          : "Backend API URL is missing."
+      }}
+    </p>
+    <p class="status-note">{{ firestoreStatusMessage }}</p>
   </section>
 </main>

@@ -58,18 +58,21 @@ Frontend default URL: `http://localhost:4200`
 
 No real Firebase credentials are committed. The project boots without them.
 
-### Frontend Firebase web config
+### Frontend config
 
-Update placeholders in:
+Keep frontend values browser-safe only:
 
 - `frontend/src/environments/environment.ts`
 - `frontend/src/environments/environment.development.ts`
 
-Insert your Firebase web app values (`apiKey`, `authDomain`, `projectId`, etc.).
+Set only:
+
+- `apiBaseUrl` (backend URL)
+- `appName`
 
 ### Backend Firebase Admin config
 
-1. Copy example env file:
+1. Copy `.env.example` to `.env`:
 
 ```bash
 cd backend
@@ -81,5 +84,7 @@ cp .env.example .env
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
+- `FIREBASE_DATABASE_URL`
+- `FRONTEND_URL`
 
 If these are missing, backend still starts and skips Firebase Admin initialization.

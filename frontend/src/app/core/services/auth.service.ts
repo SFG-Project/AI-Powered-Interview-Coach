@@ -1,13 +1,7 @@
+import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
-import { FirebaseError } from "firebase/app";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-} from "firebase/auth";
-import { firebaseAuth } from "../firebase";
-import { UserProfileService } from "./user-profile.service";
+import { firstValueFrom } from "rxjs";
+import { environment } from "../../../environments/environment";
 
 export interface SignUpPayload {
   firstName: string;
@@ -19,15 +13,18 @@ export interface SignUpPayload {
 
 @Injectable({ providedIn: "root" })
 export class AuthService {
-  private readonly userProfileService = inject(UserProfileService);
-  private tokenKey = 'authToken';
+  private readonly http = inject(HttpClient);
+  private readonly tokenKey = "authToken";
 
   async signIn(email: string, password: string): Promise<void> {
-    const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
-    const idToken = await userCredential.user.getIdToken();
+    const response = await firstValueFrom(
+      this.http.post<{ idToken: string }>(
+        `${environment.apiBaseUrl}/api/auth/signin`,
+        { email, password }
+      )
+    );
 
-    // Save Firebase ID token locally
-    sessionStorage.setItem(this.tokenKey, idToken);
+    sessionStorage.setItem(this.tokenKey, response.idToken);
   }
 
   getToken(): string | null {
@@ -43,30 +40,9 @@ export class AuthService {
   }
 
   async signUp(payload: SignUpPayload): Promise<void> {
-    const credential = await createUserWithEmailAndPassword(
-      firebaseAuth,
-      payload.email,
-      payload.password
+    await firstValueFrom(
+      this.http.post<{ id: string }>(`${environment.apiBaseUrl}/api/auth/signup`, payload)
     );
-
-    const displayName = `${payload.firstName} ${payload.lastName}`.trim();
-
-    try {
-      await updateProfile(credential.user, { displayName });
-
-      await this.userProfileService.saveProfile(credential.user.uid, {
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        displayName,
-        email: payload.email,
-        industry: payload.industry,
-      });
-    } catch (error) {
-      await signOut(firebaseAuth);
-      throw error;
-    }
-
-    await signOut(firebaseAuth);
   }
 
   getSignInErrorMessage(error: unknown): string {
@@ -114,18 +90,20 @@ export class AuthService {
   }
 
   private getErrorCode(error: unknown): string | undefined {
-    if (error instanceof FirebaseError) {
-      return error.code;
-    }
+    if (error instanceof HttpErrorResponse) {
+      if (
+        error.error &&
+        typeof error.error === "object" &&
+        typeof (error.error as { errorCode?: unknown }).errorCode === "string"
+      ) {
+        return (error.error as { errorCode: string }).errorCode;
+      }
 
-    if (
-      error instanceof Error &&
-      typeof (error as { code?: unknown }).code === "string"
-    ) {
-      return (error as { code?: string }).code;
+      if (typeof error.message === "string" && error.message) {
+        return error.message;
+      }
     }
 
     return undefined;
   }
-
 }
