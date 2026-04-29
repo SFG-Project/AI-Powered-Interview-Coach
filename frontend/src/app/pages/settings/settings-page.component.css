@@ -1,0 +1,35 @@
+.placeholder-page {
+  min-height: 100vh;
+  background: #e9edf3;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.placeholder-content {
+  padding: 24px 18px;
+}
+
+.placeholder-content h1 {
+  margin: 0;
+  color: #0b1324;
+  font-size: clamp(2rem, 4vw, 2.3rem);
+}
+
+.placeholder-card {
+  margin-top: 12px;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 22px 18px;
+}
+
+.placeholder-card p {
+  margin: 0;
+  color: #313b49;
+  font-size: 1.15rem;
+}
+
+@media (max-width: 900px) {
+  .placeholder-page {
+    grid-template-columns: 1fr;
+  }
+}

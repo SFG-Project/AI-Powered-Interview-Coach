@@ -1,0 +1,34 @@
+<aside class="sidebar">
+  <div class="brand">AI Coach</div>
+  <a
+    class="section-link"
+    [class.active]="activeItem === 'interview-session'"
+    [routerLink]="interviewSessionRoute"
+  >
+    Interview Session
+  </a>
+
+  <nav class="nav-list" aria-label="Dashboard navigation">
+    <ng-container *ngFor="let item of navItems">
+    <!-- Normal navigation items -->
+    <a
+      *ngIf="item.key !== 'sign-out'; else signOutTemplate"
+      class="nav-item"
+      [class.active]="activeItem === item.key"
+      [routerLink]="item.route"
+    >
+      {{ item.label }}
+    </a>
+
+    <!-- Sign Out item -->
+    <ng-template #signOutTemplate>
+      <a
+        class="nav-item"
+        (click)="onNavItemClick(item)"
+      >
+        {{ item.label }}
+      </a>
+    </ng-template>
+  </ng-container>
+  </nav>
+</aside>

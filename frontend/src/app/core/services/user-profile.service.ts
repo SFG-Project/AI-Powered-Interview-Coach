@@ -4,8 +4,11 @@ import { firestoreCollections, firestoreDb } from "../firebase";
 
 export interface UserProfile {
   id: string;
+  firstName?: string;
+  lastName?: string;
   displayName?: string;
   email?: string;
+  industry?: string;
 }
 
 @Injectable({ providedIn: "root" })

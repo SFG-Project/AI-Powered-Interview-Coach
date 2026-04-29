@@ -1,0 +1,106 @@
+<main class="auth-page">
+  <section class="auth-shell">
+    <aside class="auth-side">
+      <p class="eyebrow">Get Started</p>
+      <h1>Already have an Account?</h1>
+      <p>
+        Sign in to continue preparing with adaptive interview coaching and
+        personalized performance feedback.
+      </p>
+      <a class="side-link" routerLink="/signin">Go to sign in</a>
+    </aside>
+
+    <section class="auth-form-panel">
+      <h2>Sign up</h2>
+      <p class="form-note">Create your account in a few simple steps.</p>
+
+      <div class="error-box" *ngIf="validationErrors.length || authError">
+        <p *ngFor="let error of validationErrors">{{ error }}</p>
+        <p *ngIf="authError">{{ authError }}</p>
+      </div>
+
+      <form novalidate (submit)="onSubmit($event)">
+        <div class="name-grid">
+          <div>
+            <label for="first-name">First name</label>
+            <input
+              id="first-name"
+              type="text"
+              [value]="firstName"
+              (input)="onFieldInput('firstName', $event)"
+              autocomplete="given-name"
+            />
+          </div>
+
+          <div>
+            <label for="last-name">Last name</label>
+            <input
+              id="last-name"
+              type="text"
+              [value]="lastName"
+              (input)="onFieldInput('lastName', $event)"
+              autocomplete="family-name"
+            />
+          </div>
+        </div>
+
+        <label for="signup-email">Email</label>
+        <input
+          id="signup-email"
+          type="email"
+          [value]="email"
+          (input)="onFieldInput('email', $event)"
+          autocomplete="email"
+        />
+
+        <label for="industry">Industry</label>
+        <select
+          id="industry"
+          [value]="industry"
+          (change)="onFieldInput('industry', $event)"
+        >
+          <option value="">Select industry</option>
+          <option *ngFor="let option of industries" [value]="option">
+            {{ option }}
+          </option>
+        </select>
+
+        <label for="signup-password">Password</label>
+        <input
+          id="signup-password"
+          type="password"
+          [value]="password"
+          (input)="onFieldInput('password', $event)"
+          autocomplete="new-password"
+        />
+
+        <label for="confirm-password">Confirm password</label>
+        <input
+          id="confirm-password"
+          type="password"
+          [value]="confirmPassword"
+          (input)="onFieldInput('confirmPassword', $event)"
+          autocomplete="new-password"
+        />
+
+        <label class="terms">
+          <input
+            type="checkbox"
+            [checked]="acceptedTerms"
+            (change)="onTermsChange($event)"
+          />
+          <span>I agree to the terms and privacy policy.</span>
+        </label>
+
+        <button type="submit" [disabled]="isSubmitting">
+          {{ isSubmitting ? "Creating account..." : "Sign up" }}
+        </button>
+      </form>
+
+      <p class="switch-text">
+        Already have an account?
+        <a routerLink="/signin">Sign in</a>
+      </p>
+    </section>
+  </section>
+</main>
