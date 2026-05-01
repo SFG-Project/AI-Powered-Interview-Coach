@@ -15,6 +15,18 @@ const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY;
 const USERS_COLLECTION = "users";
 const FIRESTORE_HEALTH_COLLECTION = "healthChecks";
 const FIRESTORE_HEALTH_DOC_ID = "landingPageConnectivityProbe";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ALLOWED_CAREER_FIELDS = [
+  "Software Developer",
+  "Data Analyst",
+  "Business Analyst",
+  "Project Manager",
+  "Cybersecurity Analyst",
+  "Other",
+];
+const ALLOWED_EXPERIENCE_LEVELS = ["Beginner", "Intermediate", "Advanced"];
+const ALLOWED_INTERVIEW_TYPES = ["Technical", "Behavioural", "HR", "Mixed"];
+const ALLOWED_DIFFICULTIES = ["Easy", "Medium", "Hard"];
 
 app.use(
   cors(
@@ -185,6 +197,165 @@ app.post("/api/auth/signin", async (req, res) => {
   }
 });
 
+app.get("/api/settings/me", requireAuthenticatedUser, async (req, res) => {
+  const firestore = getFirestoreForSettingsOrRespond(res);
+  if (!firestore) {
+    return;
+  }
+
+  try {
+    const settingsSnapshot = await ensureUserSettingsDocument(firestore, req.authUser);
+    res.status(200).json(buildSettingsResponse(settingsSnapshot));
+  } catch (error) {
+    const normalizedError = toSerializableError(error);
+    res.status(500).json({
+      message: "Failed to fetch settings.",
+      errorCode: normalizedError.code,
+      errorMessage: normalizedError.message,
+    });
+  }
+});
+
+app.put("/api/settings/profile", requireAuthenticatedUser, async (req, res) => {
+  const firestore = getFirestoreForSettingsOrRespond(res);
+  if (!firestore) {
+    return;
+  }
+
+  const payload = req.body;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    res.status(400).json({ message: "Profile payload must be a JSON object." });
+    return;
+  }
+
+  const fullName = getRequiredTrimmedString(payload.fullName);
+  const email = getRequiredTrimmedString(payload.email);
+  const careerField = getTrimmedString(payload.careerField);
+  const experienceLevel = getTrimmedString(payload.experienceLevel);
+
+  if (!fullName) {
+    res.status(400).json({ message: "fullName is required." });
+    return;
+  }
+
+  if (!email) {
+    res.status(400).json({ message: "email is required." });
+    return;
+  }
+
+  if (!EMAIL_PATTERN.test(email)) {
+    res.status(400).json({ message: "email must be a valid email address." });
+    return;
+  }
+
+  if (!careerField || !ALLOWED_CAREER_FIELDS.includes(careerField)) {
+    res.status(400).json({ message: "careerField is invalid." });
+    return;
+  }
+
+  if (!experienceLevel || !ALLOWED_EXPERIENCE_LEVELS.includes(experienceLevel)) {
+    res.status(400).json({ message: "experienceLevel is invalid." });
+    return;
+  }
+
+  try {
+    await ensureUserSettingsDocument(firestore, req.authUser);
+    await firestore.collection(USERS_COLLECTION).doc(req.authUser.uid).set(
+      {
+        uid: req.authUser.uid,
+        fullName,
+        email,
+        careerField,
+        experienceLevel,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    const updatedSnapshot = await firestore
+      .collection(USERS_COLLECTION)
+      .doc(req.authUser.uid)
+      .get();
+
+    res.status(200).json(buildSettingsResponse(updatedSnapshot));
+  } catch (error) {
+    const normalizedError = toSerializableError(error);
+    res.status(500).json({
+      message: "Failed to update profile settings.",
+      errorCode: normalizedError.code,
+      errorMessage: normalizedError.message,
+    });
+  }
+});
+
+app.put("/api/settings/preferences", requireAuthenticatedUser, async (req, res) => {
+  const firestore = getFirestoreForSettingsOrRespond(res);
+  if (!firestore) {
+    return;
+  }
+
+  const payload = req.body;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    res.status(400).json({ message: "Preferences payload must be a JSON object." });
+    return;
+  }
+
+  const preferredInterviewType = getTrimmedString(payload.preferredInterviewType);
+  const defaultDifficulty = getTrimmedString(payload.defaultDifficulty);
+  const notesValue = getOptionalString(payload.notes);
+
+  if (
+    !preferredInterviewType ||
+    !ALLOWED_INTERVIEW_TYPES.includes(preferredInterviewType)
+  ) {
+    res.status(400).json({ message: "preferredInterviewType is invalid." });
+    return;
+  }
+
+  if (!defaultDifficulty || !ALLOWED_DIFFICULTIES.includes(defaultDifficulty)) {
+    res.status(400).json({ message: "defaultDifficulty is invalid." });
+    return;
+  }
+
+  if (notesValue === null) {
+    res.status(400).json({ message: "notes must be a string." });
+    return;
+  }
+
+  if ((notesValue || "").length > 1000) {
+    res.status(400).json({ message: "notes must not exceed 1000 characters." });
+    return;
+  }
+
+  try {
+    await ensureUserSettingsDocument(firestore, req.authUser);
+    await firestore.collection(USERS_COLLECTION).doc(req.authUser.uid).set(
+      {
+        uid: req.authUser.uid,
+        preferredInterviewType,
+        defaultDifficulty,
+        notes: (notesValue || "").trim(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    const updatedSnapshot = await firestore
+      .collection(USERS_COLLECTION)
+      .doc(req.authUser.uid)
+      .get();
+
+    res.status(200).json(buildSettingsResponse(updatedSnapshot));
+  } catch (error) {
+    const normalizedError = toSerializableError(error);
+    res.status(500).json({
+      message: "Failed to update interview preferences.",
+      errorCode: normalizedError.code,
+      errorMessage: normalizedError.message,
+    });
+  }
+});
+
 app.get("/api/firestore/health", async (_req, res) => {
   const firestore = getFirestoreOrRespond(res);
   if (!firestore) {
@@ -309,6 +480,219 @@ app.listen(PORT, () => {
   console.log(`Backend server listening on http://localhost:${PORT}`);
 });
 
+async function requireAuthenticatedUser(req, res, next) {
+  if (!isFirebaseAdminInitialized()) {
+    res.status(500).json({
+      message: "Firebase Admin credentials are not configured on the backend.",
+      errorCode: "firebase-admin-not-configured",
+    });
+    return;
+  }
+
+  const token = readBearerToken(req.headers.authorization);
+  if (!token) {
+    res.status(401).json({ message: "Missing or invalid Authorization header." });
+    return;
+  }
+
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.authUser = {
+      uid: decodedToken.uid,
+      email: typeof decodedToken.email === "string" ? decodedToken.email : "",
+      displayName: typeof decodedToken.name === "string" ? decodedToken.name : "",
+    };
+    next();
+  } catch {
+    res.status(401).json({ message: "Invalid or expired authentication token." });
+  }
+}
+
+function readBearerToken(authorizationHeader) {
+  if (typeof authorizationHeader !== "string") {
+    return null;
+  }
+
+  const [scheme, token] = authorizationHeader.split(" ");
+  if (!scheme || !token || scheme.toLowerCase() !== "bearer") {
+    return null;
+  }
+
+  const trimmedToken = token.trim();
+  return trimmedToken || null;
+}
+
+function getFirestoreForSettingsOrRespond(res) {
+  if (!isFirebaseAdminInitialized()) {
+    res.status(500).json({
+      message: "Firebase Admin credentials are not configured on the backend.",
+      errorCode: "firebase-admin-not-configured",
+    });
+    return null;
+  }
+
+  return admin.firestore();
+}
+
+async function ensureUserSettingsDocument(firestore, authUser) {
+  const docRef = firestore.collection(USERS_COLLECTION).doc(authUser.uid);
+  let snapshot = await docRef.get();
+
+  if (!snapshot.exists) {
+    const defaults = await getDefaultSettingsValues(authUser, undefined);
+
+    await docRef.set({
+      uid: authUser.uid,
+      email: defaults.email,
+      fullName: defaults.fullName,
+      careerField: defaults.careerField,
+      experienceLevel: defaults.experienceLevel,
+      preferredInterviewType: defaults.preferredInterviewType,
+      defaultDifficulty: defaults.defaultDifficulty,
+      notes: defaults.notes,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return await docRef.get();
+  }
+
+  const data = snapshot.data() || {};
+  const normalizedValues = await getDefaultSettingsValues(authUser, data);
+
+  const patch = {};
+
+  if (typeof data.uid !== "string" || data.uid.trim() !== authUser.uid) {
+    patch.uid = authUser.uid;
+  }
+
+  if (typeof data.email !== "string" || !data.email.trim()) {
+    patch.email = normalizedValues.email;
+  }
+
+  if (typeof data.fullName !== "string" || !data.fullName.trim()) {
+    patch.fullName = normalizedValues.fullName;
+  }
+
+  if (!ALLOWED_CAREER_FIELDS.includes(data.careerField)) {
+    patch.careerField = normalizedValues.careerField;
+  }
+
+  if (!ALLOWED_EXPERIENCE_LEVELS.includes(data.experienceLevel)) {
+    patch.experienceLevel = normalizedValues.experienceLevel;
+  }
+
+  if (!ALLOWED_INTERVIEW_TYPES.includes(data.preferredInterviewType)) {
+    patch.preferredInterviewType = normalizedValues.preferredInterviewType;
+  }
+
+  if (!ALLOWED_DIFFICULTIES.includes(data.defaultDifficulty)) {
+    patch.defaultDifficulty = normalizedValues.defaultDifficulty;
+  }
+
+  const currentNotes = typeof data.notes === "string" ? data.notes : "";
+  if (currentNotes.length > 1000) {
+    patch.notes = currentNotes.slice(0, 1000);
+  } else if (typeof data.notes !== "string") {
+    patch.notes = normalizedValues.notes;
+  }
+
+  if (!data.createdAt) {
+    patch.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  if (Object.keys(patch).length > 0) {
+    patch.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    await docRef.set(patch, { merge: true });
+    snapshot = await docRef.get();
+  }
+
+  return snapshot;
+}
+
+async function getDefaultSettingsValues(authUser, existingData) {
+  const authUserRecord = await getAuthUserRecord(authUser.uid);
+  const displayNameFromExisting = getTrimmedString(existingData?.displayName);
+  const displayNameFromAuth = getTrimmedString(authUserRecord?.displayName);
+  const displayNameFromToken = getTrimmedString(authUser.displayName);
+
+  const firstName = getTrimmedString(existingData?.firstName);
+  const lastName = getTrimmedString(existingData?.lastName);
+  const fullNameFromNames = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return {
+    email:
+      getTrimmedString(existingData?.email) ||
+      getTrimmedString(authUserRecord?.email) ||
+      getTrimmedString(authUser.email) ||
+      "",
+    fullName:
+      getTrimmedString(existingData?.fullName) ||
+      displayNameFromExisting ||
+      fullNameFromNames ||
+      displayNameFromAuth ||
+      displayNameFromToken ||
+      "",
+    careerField: ALLOWED_CAREER_FIELDS.includes(existingData?.careerField)
+      ? existingData.careerField
+      : "Software Developer",
+    experienceLevel: ALLOWED_EXPERIENCE_LEVELS.includes(existingData?.experienceLevel)
+      ? existingData.experienceLevel
+      : "Intermediate",
+    preferredInterviewType: ALLOWED_INTERVIEW_TYPES.includes(
+      existingData?.preferredInterviewType
+    )
+      ? existingData.preferredInterviewType
+      : "Technical",
+    defaultDifficulty: ALLOWED_DIFFICULTIES.includes(existingData?.defaultDifficulty)
+      ? existingData.defaultDifficulty
+      : "Medium",
+    notes:
+      typeof existingData?.notes === "string" ? existingData.notes.slice(0, 1000) : "",
+  };
+}
+
+async function getAuthUserRecord(uid) {
+  try {
+    return await admin.auth().getUser(uid);
+  } catch {
+    return null;
+  }
+}
+
+function buildSettingsResponse(snapshot) {
+  const data = snapshot.data() || {};
+
+  return {
+    uid: snapshot.id,
+    email: typeof data.email === "string" ? data.email : "",
+    fullName: typeof data.fullName === "string" ? data.fullName : "",
+    careerField: ALLOWED_CAREER_FIELDS.includes(data.careerField)
+      ? data.careerField
+      : "Software Developer",
+    experienceLevel: ALLOWED_EXPERIENCE_LEVELS.includes(data.experienceLevel)
+      ? data.experienceLevel
+      : "Intermediate",
+    preferredInterviewType: ALLOWED_INTERVIEW_TYPES.includes(data.preferredInterviewType)
+      ? data.preferredInterviewType
+      : "Technical",
+    defaultDifficulty: ALLOWED_DIFFICULTIES.includes(data.defaultDifficulty)
+      ? data.defaultDifficulty
+      : "Medium",
+    notes: typeof data.notes === "string" ? data.notes : "",
+    createdAt: toIsoTimestamp(data.createdAt),
+    updatedAt: toIsoTimestamp(data.updatedAt),
+  };
+}
+
+function toIsoTimestamp(value) {
+  if (value && typeof value.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+
+  return null;
+}
+
 function getValidatedUserId(value) {
   if (typeof value !== "string") {
     return null;
@@ -368,6 +752,23 @@ function getTrimmedString(value) {
 
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function getRequiredTrimmedString(value) {
+  const trimmedValue = getTrimmedString(value);
+  return trimmedValue || undefined;
+}
+
+function getOptionalString(value) {
+  if (value === undefined) {
+    return "";
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return value;
 }
 
 function normalizeAuthError(error) {

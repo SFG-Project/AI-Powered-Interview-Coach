@@ -1,11 +1,131 @@
-<main class="placeholder-page">
+<main class="settings-page">
   <app-sidebar [activeItem]="'settings'"></app-sidebar>
 
-  <section class="placeholder-content">
+  <section class="settings-content">
     <h1>Settings</h1>
 
-    <article class="placeholder-card">
-      <p>This page is under construction.</p>
+    <article class="intro-card">
+      <h2>Manage your profile and preferences</h2>
+      <p>Update personal details and default interview options.</p>
     </article>
+
+    <p class="status-banner status-loading" *ngIf="isLoading">Loading settings...</p>
+    <p class="status-banner status-error" *ngIf="loadErrorMessage">{{ loadErrorMessage }}</p>
+
+    <section class="settings-grid">
+      <article class="settings-card">
+        <h2>Profile Settings</h2>
+
+        <p class="status-banner status-success" *ngIf="profileSuccessMessage">
+          {{ profileSuccessMessage }}
+        </p>
+        <p class="status-banner status-error" *ngIf="profileErrorMessage">
+          {{ profileErrorMessage }}
+        </p>
+
+        <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" novalidate>
+          <label for="settings-full-name">Full Name</label>
+          <input id="settings-full-name" type="text" formControlName="fullName" />
+          <p
+            class="field-error"
+            *ngIf="
+              profileForm.controls.fullName.invalid &&
+              profileForm.controls.fullName.touched
+            "
+          >
+            Full Name is required.
+          </p>
+
+          <label for="settings-email">Email</label>
+          <input id="settings-email" type="email" formControlName="email" />
+          <p
+            class="field-error"
+            *ngIf="profileForm.controls.email.hasError('required') && profileForm.controls.email.touched"
+          >
+            Email is required.
+          </p>
+          <p
+            class="field-error"
+            *ngIf="profileForm.controls.email.hasError('email') && profileForm.controls.email.touched"
+          >
+            Enter a valid email address.
+          </p>
+
+          <label for="settings-career-field">Career Field</label>
+          <select id="settings-career-field" formControlName="careerField">
+            <option *ngFor="let option of careerFieldOptions" [value]="option">
+              {{ option }}
+            </option>
+          </select>
+
+          <label for="settings-experience-level">Experience Level</label>
+          <select id="settings-experience-level" formControlName="experienceLevel">
+            <option *ngFor="let option of experienceLevelOptions" [value]="option">
+              {{ option }}
+            </option>
+          </select>
+
+          <button
+            type="submit"
+            class="btn btn-profile"
+            [disabled]="isLoading || isSavingProfile"
+          >
+            {{ isSavingProfile ? "Saving..." : "Save Changes" }}
+          </button>
+        </form>
+      </article>
+
+      <article class="settings-card">
+        <h2>Interview Preferences</h2>
+
+        <p class="status-banner status-success" *ngIf="preferencesSuccessMessage">
+          {{ preferencesSuccessMessage }}
+        </p>
+        <p class="status-banner status-error" *ngIf="preferencesErrorMessage">
+          {{ preferencesErrorMessage }}
+        </p>
+
+        <form [formGroup]="preferencesForm" (ngSubmit)="updatePreferences()" novalidate>
+          <label for="settings-interview-type">Preferred Interview Type</label>
+          <select id="settings-interview-type" formControlName="preferredInterviewType">
+            <option *ngFor="let option of interviewTypeOptions" [value]="option">
+              {{ option }}
+            </option>
+          </select>
+
+          <label for="settings-difficulty">Default Difficulty</label>
+          <select id="settings-difficulty" formControlName="defaultDifficulty">
+            <option *ngFor="let option of difficultyOptions" [value]="option">
+              {{ option }}
+            </option>
+          </select>
+
+          <label for="settings-notes">Notes</label>
+          <textarea
+            id="settings-notes"
+            formControlName="notes"
+            rows="5"
+            placeholder="Add your preferences here..."
+          ></textarea>
+          <p
+            class="field-error"
+            *ngIf="
+              preferencesForm.controls.notes.hasError('maxlength') &&
+              preferencesForm.controls.notes.touched
+            "
+          >
+            Notes cannot exceed 1000 characters.
+          </p>
+
+          <button
+            type="submit"
+            class="btn btn-preferences"
+            [disabled]="isLoading || isSavingPreferences"
+          >
+            {{ isSavingPreferences ? "Updating..." : "Update Preferences" }}
+          </button>
+        </form>
+      </article>
+    </section>
   </section>
 </main>
