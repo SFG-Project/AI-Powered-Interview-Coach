@@ -8,6 +8,7 @@ const {
   isFirebaseAdminInitialized,
 } = require("./config/firebaseAdmin");
 const { interviewRoutes } = require("./routes/interviewRoutes");
+const { createDashboardRoutes } = require("./routes/dashboardRoutes");
 const { getProgressForUser } = require("./services/progressService");
 const { getFeedbackReportsForUser } = require("./services/feedbackReportsService");
 
@@ -46,6 +47,7 @@ app.use(express.json());
 initializeFirebaseAdmin();
 logMissingCriticalEnvironmentVariables();
 app.use("/api/interview", interviewRoutes);
+app.use("/api/dashboard", createDashboardRoutes({ requireAuthenticatedUser }));
 
 app.get("/api/health", (_req, res) => {
   res.json({ message: "Backend is running" });

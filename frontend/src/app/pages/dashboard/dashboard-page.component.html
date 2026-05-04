@@ -4,6 +4,12 @@
   <section class="dashboard-content">
     <h1>Dashboard</h1>
 
+    <article class="status-card" *ngIf="state === 'loading'">Loading dashboard...</article>
+
+    <article class="status-card status-card-error" *ngIf="state === 'error'">
+      Could not load dashboard data right now.
+    </article>
+
     <section class="summary-grid" aria-label="Dashboard summary cards">
       <article class="summary-card" *ngFor="let card of summaryCards">
         <p class="summary-label">{{ card.label }}</p>
@@ -12,11 +18,8 @@
     </section>
 
     <section class="welcome-card">
-      <h2>Welcome Back</h2>
-      <p>
-        You are improving. Keep practicing to increase confidence and
-        communication.
-      </p>
+      <h2>{{ welcomeTitle }}</h2>
+      <p>{{ welcomeMessage }}</p>
 
       <div class="welcome-actions">
         <button
@@ -39,7 +42,7 @@
       <h2>Recent Interviews</h2>
 
       <div class="table-wrap">
-        <table>
+        <table *ngIf="recentInterviews.length > 0; else emptyRecentInterviewsState">
           <thead>
             <tr>
               <th>Date</th>
@@ -58,6 +61,11 @@
           </tbody>
         </table>
       </div>
+      <ng-template #emptyRecentInterviewsState>
+        <p class="empty-copy">
+          No completed interviews yet. Start an interview to see your history here.
+        </p>
+      </ng-template>
     </section>
   </section>
 </main>
