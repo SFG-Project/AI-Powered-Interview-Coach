@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component } from "@angular/core";
+import { RouterLink } from "@angular/router";
 import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
 
 interface SummaryCard {
@@ -17,7 +18,7 @@ interface InterviewRow {
 @Component({
   selector: "app-dashboard-page",
   standalone: true,
-  imports: [CommonModule, SidebarComponent],
+  imports: [CommonModule, SidebarComponent, RouterLink],
   templateUrl: "./dashboard-page.component.html",
   styleUrls: ["./dashboard-page.component.css"],
 })

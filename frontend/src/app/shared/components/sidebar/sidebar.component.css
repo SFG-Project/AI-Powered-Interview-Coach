@@ -4,6 +4,9 @@
   padding: 26px 14px;
   background: #08152d;
   color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .brand {
@@ -51,6 +54,13 @@
 .nav-item.active {
   background: #2d69f6;
   color: #ffffff;
+}
+
+.sidebar-footer {
+  margin: 16px 0 0;
+  color: #8095c0;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 @media (max-width: 900px) {
