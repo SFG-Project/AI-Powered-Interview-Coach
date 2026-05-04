@@ -9,6 +9,7 @@ const {
 } = require("./config/firebaseAdmin");
 const { interviewRoutes } = require("./routes/interviewRoutes");
 const { getProgressForUser } = require("./services/progressService");
+const { getFeedbackReportsForUser } = require("./services/feedbackReportsService");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -403,6 +404,34 @@ app.get("/api/progress/me", requireAuthenticatedUser, async (req, res) => {
     const normalizedError = toSerializableError(error);
     res.status(500).json({
       message: "Failed to load progress.",
+      errorCode: normalizedError.code,
+      errorMessage: normalizedError.message,
+    });
+  }
+});
+
+app.get("/api/feedback-reports/me", requireAuthenticatedUser, async (req, res) => {
+  const firestore = getFirestoreForSettingsOrRespond(res);
+  if (!firestore) {
+    return;
+  }
+
+  logFeedbackReportsRouteHit(req.authUser?.uid);
+
+  try {
+    const feedbackReportsPayload = await getFeedbackReportsForUser(
+      firestore,
+      req.authUser.uid
+    );
+    logFeedbackReportsRouteResult(
+      req.authUser?.uid,
+      feedbackReportsPayload?.reports?.length
+    );
+    res.status(200).json(feedbackReportsPayload);
+  } catch (error) {
+    const normalizedError = toSerializableError(error);
+    res.status(500).json({
+      message: "Failed to load feedback reports.",
       errorCode: normalizedError.code,
       errorMessage: normalizedError.message,
     });
@@ -1021,6 +1050,29 @@ function logProgressRouteResult(uid, completedInterviews) {
   const hasUserId = typeof uid === "string" && Boolean(uid.trim());
   console.info(
     `[progress/me] userIdFound=${hasUserId}. completedSessions=${completedCount}.`
+  );
+}
+
+function logFeedbackReportsRouteHit(uid) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const hasUserId = typeof uid === "string" && Boolean(uid.trim());
+  console.info(`[feedback-reports/me] GET hit. userIdFound=${hasUserId}.`);
+}
+
+function logFeedbackReportsRouteResult(uid, reportCount) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const completedCount = Number.isFinite(Number(reportCount))
+    ? Number(reportCount)
+    : 0;
+  const hasUserId = typeof uid === "string" && Boolean(uid.trim());
+  console.info(
+    `[feedback-reports/me] userIdFound=${hasUserId}. completedReports=${completedCount}.`
   );
 }
 

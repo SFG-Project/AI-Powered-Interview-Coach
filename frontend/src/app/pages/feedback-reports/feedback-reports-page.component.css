@@ -1,35 +1,121 @@
-.placeholder-page {
+.feedback-reports-page {
   min-height: 100vh;
   background: #e9edf3;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
-.placeholder-content {
+.feedback-reports-content {
+  padding: 20px 16px;
+}
+
+.feedback-reports-content h1 {
+  margin: 0;
+  color: #0b1324;
+  font-size: clamp(1.9rem, 4vw, 2.4rem);
+}
+
+.overview-card,
+.report-card,
+.status-card {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #d8dee8;
+  box-shadow: 0 1px 2px rgba(10, 25, 47, 0.06);
+}
+
+.overview-card {
+  margin-top: 12px;
   padding: 24px 18px;
 }
 
-.placeholder-content h1 {
+.overview-card h2 {
   margin: 0;
   color: #0b1324;
-  font-size: clamp(2rem, 4vw, 2.3rem);
+  font-size: 2rem;
 }
 
-.placeholder-card {
+.overview-card p {
+  margin: 10px 0 0;
+  color: #2b3546;
+  font-size: 1.05rem;
+}
+
+.status-card {
   margin-top: 12px;
-  background: #ffffff;
-  border-radius: 10px;
   padding: 22px 18px;
+  color: #233044;
+  font-size: 1rem;
 }
 
-.placeholder-card p {
-  margin: 0;
-  color: #313b49;
-  font-size: 1.15rem;
+.status-card-error {
+  color: #8a1c1c;
+}
+
+.report-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.report-card {
+  padding: 20px 16px;
+}
+
+.report-card h3 {
+  margin: 0 0 10px;
+  color: #0b1324;
+  font-size: 1.85rem;
+}
+
+.report-line {
+  margin: 0 0 6px;
+  color: #1d2940;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.report-summary {
+  margin: 10px 0 0;
+  color: #2d3b4f;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.report-details {
+  margin-top: 12px;
+}
+
+.report-details summary {
+  cursor: pointer;
+  color: #2d69f6;
+  font-weight: 600;
+}
+
+.question-card {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f4f7fc;
+}
+
+.question-card p {
+  margin: 0 0 6px;
+  color: #233044;
+  font-size: 0.96rem;
+  line-height: 1.45;
+}
+
+.question-card p:last-child {
+  margin-bottom: 0;
 }
 
 @media (max-width: 900px) {
-  .placeholder-page {
+  .feedback-reports-page {
     grid-template-columns: 1fr;
+  }
+
+  .feedback-reports-content {
+    padding: 16px;
   }
 }
