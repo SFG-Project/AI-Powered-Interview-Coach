@@ -11,7 +11,6 @@ const {
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL;
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY;
 const USERS_COLLECTION = "users";
 const FIRESTORE_HEALTH_COLLECTION = "healthChecks";
 const FIRESTORE_HEALTH_DOC_ID = "landingPageConnectivityProbe";
@@ -33,6 +32,8 @@ app.use(
     FRONTEND_URL
       ? {
           origin: FRONTEND_URL,
+          methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+          allowedHeaders: ["Content-Type", "Authorization"],
         }
       : undefined
   )
@@ -40,6 +41,7 @@ app.use(
 app.use(express.json());
 
 initializeFirebaseAdmin();
+logMissingCriticalEnvironmentVariables();
 
 app.get("/api/health", (_req, res) => {
   res.json({ message: "Backend is running" });
@@ -127,6 +129,8 @@ app.post("/api/auth/signup", async (req, res) => {
 });
 
 app.post("/api/auth/signin", async (req, res) => {
+  logSignInRouteHit(req);
+
   const payload = req.body;
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     res.status(400).json({ message: "Signin payload must be a JSON object." });
@@ -135,8 +139,10 @@ app.post("/api/auth/signin", async (req, res) => {
 
   const email = getTrimmedString(payload.email);
   const password = getTrimmedString(payload.password);
+  const normalizedEmail = email ? email.toLowerCase() : undefined;
+  const firebaseWebApiKey = getFirebaseWebApiKey();
 
-  if (!email || !password) {
+  if (!normalizedEmail || !password) {
     res.status(400).json({
       errorCode: "invalid-argument",
       message: "Email and password are required.",
@@ -144,7 +150,11 @@ app.post("/api/auth/signin", async (req, res) => {
     return;
   }
 
-  if (!FIREBASE_WEB_API_KEY) {
+  if (!firebaseWebApiKey) {
+    console.warn(
+      "[auth/signin] Missing environment variable: FIREBASE_WEB_API_KEY."
+    );
+
     res.status(503).json({
       errorCode: "firebase-web-api-key-missing",
       message: "FIREBASE_WEB_API_KEY is missing on the backend.",
@@ -155,13 +165,13 @@ app.post("/api/auth/signin", async (req, res) => {
   try {
     const signInResponse = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(
-        FIREBASE_WEB_API_KEY
+        firebaseWebApiKey
       )}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: normalizedEmail,
           password,
           returnSecureToken: true,
         }),
@@ -175,6 +185,13 @@ app.post("/api/auth/signin", async (req, res) => {
         body?.error && typeof body.error === "object" ? body.error.message : undefined
       );
       const normalizedError = normalizeSignInApiError(message);
+
+      logSignInFailure({
+        email: normalizedEmail,
+        normalizedErrorCode: normalizedError.code,
+        providerErrorCode: message,
+      });
+
       res.status(normalizedError.httpStatus).json({
         errorCode: normalizedError.code,
         message: normalizedError.message,
@@ -190,9 +207,17 @@ app.post("/api/auth/signin", async (req, res) => {
       email: getTrimmedString(body.email),
     });
   } catch (error) {
+    const serializedError = toSerializableError(error);
+    logSignInFailure({
+      email: normalizedEmail,
+      normalizedErrorCode: "request-failed",
+      providerErrorCode: serializedError.code,
+      details: serializedError.message,
+    });
+
     res.status(500).json({
       errorCode: "request-failed",
-      message: error instanceof Error ? error.message : "Sign in failed.",
+      message: "Sign in failed due to an upstream authentication request error.",
     });
   }
 });
@@ -503,7 +528,14 @@ async function requireAuthenticatedUser(req, res, next) {
       displayName: typeof decodedToken.name === "string" ? decodedToken.name : "",
     };
     next();
-  } catch {
+  } catch (error) {
+    const serializedError = toSerializableError(error);
+    console.warn(
+      `[auth/token] Token verification failed. errorCode=${
+        serializedError.code || "unknown"
+      }.`
+    );
+
     res.status(401).json({ message: "Invalid or expired authentication token." });
   }
 }
@@ -806,11 +838,9 @@ function normalizeAuthError(error) {
 }
 
 function normalizeSignInApiError(code) {
-  if (
-    code === "INVALID_LOGIN_CREDENTIALS" ||
-    code === "INVALID_PASSWORD" ||
-    code === "EMAIL_NOT_FOUND"
-  ) {
+  const normalizedProviderCode = normalizeProviderErrorCode(code);
+
+  if (normalizedProviderCode === "INVALID_LOGIN_CREDENTIALS") {
     return {
       httpStatus: 401,
       code: "auth/invalid-credential",
@@ -818,7 +848,23 @@ function normalizeSignInApiError(code) {
     };
   }
 
-  if (code === "INVALID_EMAIL") {
+  if (normalizedProviderCode === "INVALID_PASSWORD") {
+    return {
+      httpStatus: 401,
+      code: "auth/wrong-password",
+      message: "Incorrect password.",
+    };
+  }
+
+  if (normalizedProviderCode === "EMAIL_NOT_FOUND") {
+    return {
+      httpStatus: 401,
+      code: "auth/invalid-credential",
+      message: "Invalid email or password.",
+    };
+  }
+
+  if (normalizedProviderCode === "INVALID_EMAIL") {
     return {
       httpStatus: 400,
       code: "auth/invalid-email",
@@ -826,7 +872,7 @@ function normalizeSignInApiError(code) {
     };
   }
 
-  if (code === "USER_DISABLED") {
+  if (normalizedProviderCode === "USER_DISABLED") {
     return {
       httpStatus: 403,
       code: "auth/user-disabled",
@@ -834,11 +880,30 @@ function normalizeSignInApiError(code) {
     };
   }
 
-  if (code === "TOO_MANY_ATTEMPTS_TRY_LATER") {
+  if (normalizedProviderCode === "TOO_MANY_ATTEMPTS_TRY_LATER") {
     return {
       httpStatus: 429,
       code: "auth/too-many-requests",
       message: "Too many login attempts. Please try again later.",
+    };
+  }
+
+  if (normalizedProviderCode === "OPERATION_NOT_ALLOWED") {
+    return {
+      httpStatus: 403,
+      code: "auth/operation-not-allowed",
+      message: "Email/password sign-in is not enabled for this Firebase project.",
+    };
+  }
+
+  if (
+    normalizedProviderCode === "API_KEY_INVALID" ||
+    normalizedProviderCode === "INVALID_API_KEY"
+  ) {
+    return {
+      httpStatus: 503,
+      code: "firebase-web-api-key-invalid",
+      message: "Backend Firebase web API key is invalid for sign-in.",
     };
   }
 
@@ -855,4 +920,83 @@ async function readJsonBody(response) {
   } catch {
     return {};
   }
+}
+
+function normalizeProviderErrorCode(value) {
+  const rawValue = getTrimmedString(value);
+  if (!rawValue) {
+    return undefined;
+  }
+
+  if (rawValue.includes(":")) {
+    return rawValue.split(":")[0].trim();
+  }
+
+  const uppercaseValue = rawValue.toUpperCase();
+  if (uppercaseValue.includes("API KEY NOT VALID")) {
+    return "API_KEY_INVALID";
+  }
+
+  return rawValue;
+}
+
+function logMissingCriticalEnvironmentVariables() {
+  if (!getFirebaseWebApiKey()) {
+    console.warn(
+      "[config] Missing environment variable: FIREBASE_WEB_API_KEY (required for /api/auth/signin)."
+    );
+  }
+}
+
+function getFirebaseWebApiKey() {
+  return getTrimmedString(process.env.FIREBASE_WEB_API_KEY);
+}
+
+function logSignInFailure({ email, normalizedErrorCode, providerErrorCode, details }) {
+  const detailText = details ? ` details="${details}"` : "";
+  const providerCodeText = providerErrorCode
+    ? ` providerErrorCode=${providerErrorCode}`
+    : "";
+  const maskedEmail = maskEmail(email);
+
+  console.warn(
+    `[auth/signin] Failed for ${maskedEmail}. normalizedErrorCode=${normalizedErrorCode}.${providerCodeText}${detailText}`
+  );
+}
+
+function logSignInRouteHit(req) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
+  console.info(`[auth/signin] ${req.method} ${req.path} hit from ${origin}`);
+}
+
+function isDevelopmentEnvironment() {
+  return process.env.NODE_ENV !== "production";
+}
+
+function maskEmail(email) {
+  if (typeof email !== "string") {
+    return "unknown-email";
+  }
+
+  const trimmedEmail = email.trim();
+  const atIndex = trimmedEmail.indexOf("@");
+
+  if (atIndex <= 0) {
+    return "invalid-email";
+  }
+
+  const localPart = trimmedEmail.slice(0, atIndex);
+  const domain = trimmedEmail.slice(atIndex + 1);
+  const visiblePrefix = localPart.slice(0, 1);
+  const visibleSuffix = localPart.slice(-1);
+
+  if (localPart.length === 1) {
+    return `${visiblePrefix}***@${domain}`;
+  }
+
+  return `${visiblePrefix}***${visibleSuffix}@${domain}`;
 }

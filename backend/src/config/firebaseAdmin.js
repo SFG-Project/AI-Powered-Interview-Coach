@@ -3,15 +3,25 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 function hasRequiredFirebaseEnv(env) {
-  if (Boolean(env.FIREBASE_SERVICE_ACCOUNT_PATH)) {
-    return true;
+  return getMissingFirebaseEnvVarNames(env).length === 0;
+}
+
+function getMissingFirebaseEnvVarNames(env) {
+  if (isNonEmptyString(env.FIREBASE_SERVICE_ACCOUNT_PATH)) {
+    return [];
   }
 
-  return (
-    Boolean(env.FIREBASE_PROJECT_ID) &&
-    Boolean(env.FIREBASE_CLIENT_EMAIL) &&
-    Boolean(env.FIREBASE_PRIVATE_KEY)
-  );
+  const requiredVars = [
+    "FIREBASE_PROJECT_ID",
+    "FIREBASE_CLIENT_EMAIL",
+    "FIREBASE_PRIVATE_KEY",
+  ];
+
+  return requiredVars.filter((envVarName) => !isNonEmptyString(env[envVarName]));
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function normalizePrivateKey(privateKey) {
@@ -41,8 +51,11 @@ function initializeFirebaseAdmin() {
   }
 
   if (!hasRequiredFirebaseEnv(process.env)) {
+    const missingVarNames = getMissingFirebaseEnvVarNames(process.env);
     console.warn(
-      "[firebase-admin] Credentials not found. Skipping Firebase Admin initialization."
+      `[firebase-admin] Missing environment variable(s): ${missingVarNames.join(
+        ", "
+      )}. Skipping Firebase Admin initialization.`
     );
     return { initialized: false };
   }
