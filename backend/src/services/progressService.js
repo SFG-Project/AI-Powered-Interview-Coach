@@ -294,4 +294,10 @@ async function getProgressForUser(firestore, userId) {
 module.exports = {
   getProgressForUser,
   buildEmptyProgressResponse,
+  parseScore,
+  parseMetricAsPercentage,
+  average,
+  normalizeSessionScore,
+  getSortTimestamp,
+  toIso,
 };
