@@ -8,6 +8,7 @@ const {
   isFirebaseAdminInitialized,
 } = require("./config/firebaseAdmin");
 const { interviewRoutes } = require("./routes/interviewRoutes");
+const { getProgressForUser } = require("./services/progressService");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -377,6 +378,31 @@ app.put("/api/settings/preferences", requireAuthenticatedUser, async (req, res) 
     const normalizedError = toSerializableError(error);
     res.status(500).json({
       message: "Failed to update interview preferences.",
+      errorCode: normalizedError.code,
+      errorMessage: normalizedError.message,
+    });
+  }
+});
+
+app.get("/api/progress/me", requireAuthenticatedUser, async (req, res) => {
+  const firestore = getFirestoreForSettingsOrRespond(res);
+  if (!firestore) {
+    return;
+  }
+
+  logProgressRouteHit(req.authUser?.uid);
+
+  try {
+    const progressPayload = await getProgressForUser(firestore, req.authUser.uid);
+    logProgressRouteResult(
+      req.authUser?.uid,
+      progressPayload?.overview?.completedInterviews
+    );
+    res.status(200).json(progressPayload);
+  } catch (error) {
+    const normalizedError = toSerializableError(error);
+    res.status(500).json({
+      message: "Failed to load progress.",
       errorCode: normalizedError.code,
       errorMessage: normalizedError.message,
     });
@@ -973,6 +999,29 @@ function logSignInRouteHit(req) {
 
   const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
   console.info(`[auth/signin] ${req.method} ${req.path} hit from ${origin}`);
+}
+
+function logProgressRouteHit(uid) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const hasUserId = typeof uid === "string" && Boolean(uid.trim());
+  console.info(`[progress/me] GET hit. userIdFound=${hasUserId}.`);
+}
+
+function logProgressRouteResult(uid, completedInterviews) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const completedCount = Number.isFinite(Number(completedInterviews))
+    ? Number(completedInterviews)
+    : 0;
+  const hasUserId = typeof uid === "string" && Boolean(uid.trim());
+  console.info(
+    `[progress/me] userIdFound=${hasUserId}. completedSessions=${completedCount}.`
+  );
 }
 
 function isDevelopmentEnvironment() {

@@ -73,6 +73,41 @@ function clampScore(value) {
   return Math.max(0, Math.min(10, Number(score.toFixed(1))));
 }
 
+function parseScore(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(10, Number(score.toFixed(1))));
+}
+
+function calculateSessionSummary(session) {
+  const totalQuestions = Number(session?.questionCount || session?.questions?.length || 0);
+  const answeredQuestions = session.questions.filter(
+    (question) => !question.skipped && typeof question.answer === "string" && question.answer.trim()
+  ).length;
+  const skippedQuestions = session.questions.filter((question) => question.skipped).length;
+  const scoredQuestions = session.questions
+    .map((question) => parseScore(question?.feedback?.score))
+    .filter((score) => score !== null);
+
+  const averageScore = scoredQuestions.length
+    ? Number(
+        (scoredQuestions.reduce((sum, score) => sum + score, 0) / scoredQuestions.length).toFixed(
+          1
+        )
+      )
+    : 0;
+
+  return {
+    averageScore,
+    answeredQuestions,
+    skippedQuestions,
+    totalQuestions,
+  };
+}
+
 function getUserId(value) {
   if (typeof value !== "string" || !value.trim()) {
     return FALLBACK_USER_ID;
@@ -485,6 +520,10 @@ function serializeSession(session) {
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     completedAt: session.completedAt,
+    averageScore: Number(session.averageScore || 0),
+    answeredQuestions: Number(session.answeredQuestions || 0),
+    skippedQuestions: Number(session.skippedQuestions || 0),
+    totalQuestions: Number(session.totalQuestions || session.questionCount || 0),
     questions: session.questions.map((question) => ({ ...question })),
   };
 }
@@ -512,6 +551,10 @@ async function createSessionStore(session) {
     createdAt: timestamp,
     updatedAt: timestamp,
     completedAt: null,
+    averageScore: 0,
+    answeredQuestions: 0,
+    skippedQuestions: 0,
+    totalQuestions: session.questionCount,
   });
 
   for (const question of session.questions) {
@@ -569,6 +612,10 @@ async function readFirestoreSession(sessionId) {
     createdAt: toIso(sessionData.createdAt),
     updatedAt: toIso(sessionData.updatedAt),
     completedAt: toIso(sessionData.completedAt),
+    averageScore: Number(sessionData.averageScore || 0),
+    answeredQuestions: Number(sessionData.answeredQuestions || 0),
+    skippedQuestions: Number(sessionData.skippedQuestions || 0),
+    totalQuestions: Number(sessionData.totalQuestions || sessionData.questionCount || 0),
     questions,
   };
 }
@@ -588,6 +635,11 @@ async function getSessionById(sessionId) {
 
 async function saveSessionState(session) {
   session.updatedAt = nowIsoString();
+  const sessionSummary = calculateSessionSummary(session);
+  session.averageScore = sessionSummary.averageScore;
+  session.answeredQuestions = sessionSummary.answeredQuestions;
+  session.skippedQuestions = sessionSummary.skippedQuestions;
+  session.totalQuestions = sessionSummary.totalQuestions;
 
   if (!isFirestoreReady()) {
     memorySessions.set(session.sessionId, serializeSession(session));
@@ -608,6 +660,10 @@ async function saveSessionState(session) {
       questionCount: session.questionCount,
       status: session.status,
       currentQuestionIndex: session.currentQuestionIndex,
+      averageScore: session.averageScore,
+      answeredQuestions: session.answeredQuestions,
+      skippedQuestions: session.skippedQuestions,
+      totalQuestions: session.totalQuestions,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       completedAt: session.completedAt
         ? admin.firestore.Timestamp.fromDate(new Date(session.completedAt))
@@ -687,11 +743,9 @@ function ensureActiveSession(sessionId, session) {
 }
 
 function createEndSummary(session) {
-  const answeredCount = session.questions.filter(
-    (question) => question.answer || question.skipped
-  ).length;
+  const summary = calculateSessionSummary(session);
 
-  return `Interview session completed with ${answeredCount} of ${session.questionCount} questions handled.`;
+  return `Interview session completed with ${summary.answeredQuestions} answered and ${summary.skippedQuestions} skipped out of ${summary.totalQuestions} questions.`;
 }
 
 async function startInterviewSession(payload, userIdInput) {
@@ -739,6 +793,10 @@ async function startInterviewSession(payload, userIdInput) {
     createdAt: now,
     updatedAt: now,
     completedAt: null,
+    averageScore: 0,
+    answeredQuestions: 0,
+    skippedQuestions: 0,
+    totalQuestions: questionCount,
     questions,
   };
 
