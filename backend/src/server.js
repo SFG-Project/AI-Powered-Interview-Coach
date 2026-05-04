@@ -7,6 +7,7 @@ const {
   initializeFirebaseAdmin,
   isFirebaseAdminInitialized,
 } = require("./config/firebaseAdmin");
+const { interviewRoutes } = require("./routes/interviewRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,7 +34,7 @@ app.use(
       ? {
           origin: FRONTEND_URL,
           methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-          allowedHeaders: ["Content-Type", "Authorization"],
+          allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-user"],
         }
       : undefined
   )
@@ -42,6 +43,7 @@ app.use(express.json());
 
 initializeFirebaseAdmin();
 logMissingCriticalEnvironmentVariables();
+app.use("/api/interview", interviewRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({ message: "Backend is running" });
