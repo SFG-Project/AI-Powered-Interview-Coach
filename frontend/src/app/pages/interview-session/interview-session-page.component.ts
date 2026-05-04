@@ -187,6 +187,7 @@ export class InterviewSessionPageComponent implements OnInit, OnDestroy {
       this.currentQuestion = response.question;
       this.sessionQuestionCount = response.question.total;
       this.questionPointer = response.question.number;
+      this.logQuestionSource(response.question.source);
       this.evaluation = { ...PLACEHOLDER_FEEDBACK };
       this.messages = [
         {
@@ -342,6 +343,7 @@ export class InterviewSessionPageComponent implements OnInit, OnDestroy {
       this.currentQuestion = response.nextQuestion;
       this.sessionQuestionCount = response.nextQuestion.total;
       this.questionPointer = response.nextQuestion.number;
+      this.logQuestionSource(response.nextQuestion.source);
       this.messages.push({
         sender: "ai",
         content: response.nextQuestion.text,
@@ -439,5 +441,15 @@ export class InterviewSessionPageComponent implements OnInit, OnDestroy {
     }
 
     return "Something went wrong while processing the interview request.";
+  }
+
+  private logQuestionSource(source: string | undefined): void {
+    if (environment.production) {
+      return;
+    }
+
+    const normalizedSource =
+      typeof source === "string" && source.trim() ? source.trim() : "unknown";
+    console.info(`[interview] Question source: ${normalizedSource}`);
   }
 }

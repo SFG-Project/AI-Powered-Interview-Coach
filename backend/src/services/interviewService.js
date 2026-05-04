@@ -26,6 +26,114 @@ const METRIC_STATUSES = [
   "Strong",
   "Excellent",
 ];
+const QUESTION_SOURCE_VALUES = ["grok", "fallback", "firestore", "unknown"];
+const QUESTION_SOURCE_SET = new Set(QUESTION_SOURCE_VALUES);
+const FALLBACK_SPECIFIC_POOLS = {
+  "software developer::technical": [
+    "Explain polymorphism in object-oriented programming and share one practical example.",
+    "What are key differences between REST and GraphQL, and when would you choose each?",
+    "How would you diagnose and optimize a slow database query in production?",
+    "Describe JavaScript closures and a real use case where they are useful.",
+    "How would you design error handling for a distributed microservice API?",
+    "What tradeoffs exist between SQL and NoSQL for user activity tracking?",
+    "Explain CI/CD and how it reduces release risk.",
+    "How do you approach debugging an intermittent frontend bug reported by users?",
+    "What is the purpose of indexing, and what are indexing pitfalls?",
+    "How would you secure authentication tokens in a SPA?",
+  ],
+  "software developer::behavioural": [
+    "Describe a time you had to resolve a technical disagreement with a teammate.",
+    "Tell me about a project that did not go as planned and what you learned.",
+    "How do you prioritize tasks when multiple deadlines collide?",
+    "Give an example of mentoring or helping another developer improve.",
+    "Describe a time you received difficult feedback and how you responded.",
+  ],
+  "software developer::hr": [
+    "Why are you interested in this software developer role?",
+    "How does this role fit into your career goals?",
+    "Describe your preferred team culture and work environment.",
+    "How do you handle feedback from managers and peers?",
+    "What motivates you to keep improving your technical skills?",
+  ],
+  "data analyst::technical": [
+    "How do you validate data quality before producing a business report?",
+    "Explain the difference between correlation and causation with an example.",
+    "How would you design a dashboard for executive stakeholders?",
+    "What SQL techniques do you use for large dataset performance?",
+    "How do you communicate uncertainty in analytical findings?",
+  ],
+  "business analyst::mixed": [
+    "How do you gather and prioritize stakeholder requirements?",
+    "Describe a time you resolved conflicting requirements.",
+    "How do you measure success after a process change implementation?",
+    "How do you translate technical constraints to non-technical stakeholders?",
+    "What artifacts do you produce for a requirements workshop?",
+  ],
+  "project manager::mixed": [
+    "How do you manage scope creep while keeping stakeholders aligned?",
+    "Describe your approach to risk management during delivery.",
+    "How do you recover a project that is behind schedule?",
+    "How do you handle team conflict affecting milestones?",
+    "What project metrics do you report weekly and why?",
+  ],
+  "cybersecurity analyst::technical": [
+    "How would you respond to a suspected phishing incident?",
+    "Explain defense in depth and practical controls at each layer.",
+    "What is your process for vulnerability triage and remediation?",
+    "How do you balance security controls with user productivity?",
+    "Describe a recent security threat trend and mitigation approach.",
+  ],
+};
+const FALLBACK_GENERAL_POOLS_BY_TYPE = {
+  technical: [
+    "Explain a complex technical concept in simple terms.",
+    "How do you approach debugging a high-priority production issue?",
+    "What steps do you follow before deploying a major change?",
+    "How do you evaluate tradeoffs between performance and maintainability?",
+    "Describe a technical decision you made and why it worked.",
+    "How do you ensure quality when requirements are unclear?",
+    "What tools do you use to monitor system or data reliability?",
+    "How do you break down a large technical task into milestones?",
+    "Describe your approach to writing secure code or queries.",
+    "How do you validate that your solution solved the root problem?",
+  ],
+  behavioural: [
+    "Tell me about a time you handled a difficult stakeholder conversation.",
+    "Describe a situation where you had to adapt quickly to change.",
+    "How do you prioritize when everything feels urgent?",
+    "Share an example of collaborating across teams.",
+    "Tell me about a mistake you made and what you changed afterward.",
+    "Describe a time you disagreed with a teammate and how you resolved it.",
+    "How do you stay motivated during long or challenging projects?",
+    "Tell me about a time you had to communicate bad news.",
+    "Describe how you prepare for high-pressure discussions.",
+    "How do you balance speed and quality in your work?",
+  ],
+  hr: [
+    "Why do you want to join this company?",
+    "What strengths will you bring to this role?",
+    "What is one area you are actively improving?",
+    "How do you define success in your first 90 days?",
+    "Why are you considering a new opportunity now?",
+    "What type of manager helps you perform your best?",
+    "How do you handle competing expectations from different leaders?",
+    "How do your values align with this position?",
+    "What kind of projects energize you most?",
+    "How do you handle feedback you initially disagree with?",
+  ],
+  mixed: [
+    "Walk me through a recent project you are proud of.",
+    "How do you gather requirements before solving a problem?",
+    "Describe how you communicate technical updates to non-technical stakeholders.",
+    "How do you manage risk while still delivering on time?",
+    "Give an example of a decision you made with incomplete information.",
+    "How do you prepare for interviews and evaluate your own performance?",
+    "What does a strong answer look like when discussing your past work?",
+    "Describe a challenge that improved your problem-solving approach.",
+    "How do you collaborate when priorities change mid-project?",
+    "How do you decide what to optimize first: quality, speed, or scope?",
+  ],
+};
 
 const memorySessions = new Map();
 
@@ -225,64 +333,111 @@ async function callXaiChat(messages) {
   }
 }
 
-function getFallbackQuestionPool(careerField, interviewType) {
-  const key = `${careerField}::${interviewType}`.toLowerCase();
+function normalizeQuestionSource(value, fallback = "unknown") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
 
-  const pools = {
-    "software developer::technical": [
-      "Explain polymorphism in object-oriented programming and share one practical example.",
-      "What are key differences between REST and GraphQL, and when would you choose each?",
-      "How would you diagnose and optimize a slow database query in production?",
-      "Describe JavaScript closures and a real use case where they are useful.",
-      "How would you design error handling for a distributed microservice API?",
-      "What tradeoffs exist between SQL and NoSQL for user activity tracking?",
-      "Explain CI/CD and how it reduces release risk.",
-      "How do you approach debugging an intermittent frontend bug reported by users?",
-      "What is the purpose of indexing, and what are indexing pitfalls?",
-      "How would you secure authentication tokens in a SPA?",
-    ],
-    "software developer::behavioural": [
-      "Describe a time you had to resolve a technical disagreement with a teammate.",
-      "Tell me about a project that did not go as planned and what you learned.",
-      "How do you prioritize tasks when multiple deadlines collide?",
-      "Give an example of mentoring or helping another developer improve.",
-      "Describe a time you received difficult feedback and how you responded.",
-    ],
-    "data analyst::technical": [
-      "How do you validate data quality before producing a business report?",
-      "Explain the difference between correlation and causation with an example.",
-      "How would you design a dashboard for executive stakeholders?",
-      "What SQL techniques do you use for large dataset performance?",
-      "How do you communicate uncertainty in analytical findings?",
-    ],
-    "business analyst::mixed": [
-      "How do you gather and prioritize stakeholder requirements?",
-      "Describe a time you resolved conflicting requirements.",
-      "How do you measure success after a process change implementation?",
-      "How do you translate technical constraints to non-technical stakeholders?",
-      "What artifacts do you produce for a requirements workshop?",
-    ],
-    "project manager::mixed": [
-      "How do you manage scope creep while keeping stakeholders aligned?",
-      "Describe your approach to risk management during delivery.",
-      "How do you recover a project that is behind schedule?",
-      "How do you handle team conflict affecting milestones?",
-      "What project metrics do you report weekly and why?",
-    ],
-    "cybersecurity analyst::technical": [
-      "How would you respond to a suspected phishing incident?",
-      "Explain defense in depth and practical controls at each layer.",
-      "What is your process for vulnerability triage and remediation?",
-      "How do you balance security controls with user productivity?",
-      "Describe a recent security threat trend and mitigation approach.",
-    ],
+  const normalized = value.trim().toLowerCase();
+  if (!QUESTION_SOURCE_SET.has(normalized)) {
+    return fallback;
+  }
+
+  return normalized;
+}
+
+function normalizeInterviewTypeKey(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "behavioral") {
+    return "behavioural";
+  }
+
+  return normalized;
+}
+
+function collectUniqueQuestionTexts(values) {
+  const deduped = [];
+  const seen = new Set();
+
+  values.forEach((value) => {
+    const text = typeof value === "string" ? value.trim() : "";
+    if (!text) {
+      return;
+    }
+
+    const key = text.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    deduped.push(text);
+  });
+
+  return deduped;
+}
+
+function toQuestionRecord({ number, text, source }) {
+  return {
+    questionId: `q-${number}`,
+    number,
+    text,
+    source: normalizeQuestionSource(source, "unknown"),
+    answer: "",
+    skipped: false,
+    feedback: null,
+    answeredAt: null,
+    createdAt: nowIsoString(),
   };
+}
 
-  return (
-    pools[key] ||
-    pools[`${careerField.toLowerCase()}::technical`] ||
-    pools["software developer::technical"]
+function logQuestionGenerationStart(options) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  console.info(
+    `[interview/questions] start careerField=${options.careerField} type=${options.interviewType} difficulty=${options.difficulty} questionCount=${options.questionCount}`
   );
+}
+
+function logQuestionSelection(options, question) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  console.info(
+    `[interview/questions] source=${question.source} careerField=${options.careerField} type=${options.interviewType} difficulty=${options.difficulty} number=${question.number}`
+  );
+}
+
+function logFallbackReason(reason) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  if (reason === "XAI_API_KEY missing") {
+    console.info("[interview/questions] XAI_API_KEY missing. Using fallback interview questions.");
+  }
+
+  console.info(`[interview/questions] source=fallback reason=${reason}`);
+}
+
+function getFallbackQuestionCandidates(careerField, interviewType) {
+  const careerKey = typeof careerField === "string" ? careerField.trim().toLowerCase() : "";
+  const interviewTypeKey = normalizeInterviewTypeKey(interviewType);
+  const specificKey = `${careerKey}::${interviewTypeKey}`;
+  const careerTechnicalKey = `${careerKey}::technical`;
+
+  const candidates = [
+    ...(FALLBACK_SPECIFIC_POOLS[specificKey] || []),
+    ...(FALLBACK_GENERAL_POOLS_BY_TYPE[interviewTypeKey] || []),
+    ...(FALLBACK_SPECIFIC_POOLS[careerTechnicalKey] || []),
+    ...(FALLBACK_GENERAL_POOLS_BY_TYPE.mixed || []),
+    ...(FALLBACK_GENERAL_POOLS_BY_TYPE.technical || []),
+  ];
+
+  return collectUniqueQuestionTexts(candidates);
 }
 
 function buildFallbackQuestions({
@@ -291,20 +446,23 @@ function buildFallbackQuestions({
   difficulty,
   questionCount,
 }) {
-  const pool = getFallbackQuestionPool(careerField, interviewType);
+  const baseQuestions = getFallbackQuestionCandidates(careerField, interviewType);
+  const selected = baseQuestions.slice(0, questionCount);
 
-  return Array.from({ length: questionCount }, (_item, index) => {
-    const poolQuestion = pool[index % pool.length];
-    return {
-      questionId: `q-${index + 1}`,
+  while (selected.length < questionCount) {
+    const index = selected.length + 1;
+    selected.push(
+      `Describe a practical ${interviewType.toLowerCase()} scenario relevant to ${careerField}. Focus point ${index}.`
+    );
+  }
+
+  return selected.map((text, index) =>
+    toQuestionRecord({
       number: index + 1,
-      text: `[${difficulty}] ${poolQuestion}`,
-      answer: "",
-      skipped: false,
-      feedback: null,
-      answeredAt: null,
-    };
-  });
+      text: `[${difficulty}] ${text}`,
+      source: "fallback",
+    })
+  );
 }
 
 function defaultFeedback(skipped = false) {
@@ -384,6 +542,10 @@ function normalizeFeedback(payload, skipped = false) {
 }
 
 async function generateQuestionsFromAi(options) {
+  const previousQuestions = Array.isArray(options.previousQuestions)
+    ? collectUniqueQuestionTexts(options.previousQuestions)
+    : [];
+
   const parsed = await callXaiChat([
     {
       role: "system",
@@ -395,13 +557,14 @@ async function generateQuestionsFromAi(options) {
       content: JSON.stringify({
         task: "generate_interview_questions",
         instructions:
-          "Create concise interview questions tailored to the setup. Return JSON with key 'questions' containing an array of strings.",
+          "Create concise interview questions tailored to the setup. Return JSON with key 'questions' containing an array of strings. Do not repeat any previous questions or duplicate items in the returned list.",
         setup: {
           careerField: options.careerField,
           interviewType: options.interviewType,
           difficulty: options.difficulty,
           questionCount: options.questionCount,
         },
+        previousQuestions,
       }),
     },
   ]);
@@ -410,44 +573,59 @@ async function generateQuestionsFromAi(options) {
     throw new Error("xAI did not return a valid questions array.");
   }
 
-  const cleaned = parsed.questions
-    .map((item) => String(item).trim())
-    .filter(Boolean)
+  const cleaned = collectUniqueQuestionTexts(
+    parsed.questions.map((item) => String(item))
+  )
+    .filter((item) => !previousQuestions.some((previous) => previous.toLowerCase() === item.toLowerCase()))
     .slice(0, options.questionCount);
 
   if (cleaned.length === 0) {
     throw new Error("xAI questions were empty.");
   }
 
-  while (cleaned.length < options.questionCount) {
-    cleaned.push(
-      `Describe a practical ${options.interviewType.toLowerCase()} scenario relevant to ${options.careerField}.`
+  const fallbackCandidates = buildFallbackQuestions(options).map((question) => question.text);
+  const combined = collectUniqueQuestionTexts([...cleaned, ...fallbackCandidates])
+    .slice(0, options.questionCount);
+
+  while (combined.length < options.questionCount) {
+    const questionIndex = combined.length + 1;
+    combined.push(
+      `Describe a practical ${options.interviewType.toLowerCase()} scenario relevant to ${options.careerField}. Focus point ${questionIndex}.`
     );
   }
 
-  return cleaned.map((text, index) => ({
-    questionId: `q-${index + 1}`,
-    number: index + 1,
-    text,
-    answer: "",
-    skipped: false,
-    feedback: null,
-    answeredAt: null,
-  }));
+  return combined.map((text, index) =>
+    toQuestionRecord({
+      number: index + 1,
+      text,
+      source: "grok",
+    })
+  );
 }
 
 async function generateQuestions(options) {
+  logQuestionGenerationStart(options);
+
   if (!hasXaiConfig()) {
-    return buildFallbackQuestions(options);
+    logFallbackReason("XAI_API_KEY missing");
+    const fallbackQuestions = buildFallbackQuestions(options);
+    fallbackQuestions.forEach((question) => logQuestionSelection(options, question));
+    return fallbackQuestions;
   }
 
   try {
-    return await generateQuestionsFromAi(options);
+    const aiQuestions = await generateQuestionsFromAi(options);
+    aiQuestions.forEach((question) => logQuestionSelection(options, question));
+    return aiQuestions;
   } catch (error) {
+    const reason = error instanceof Error ? error.message : "xAI generation failed";
+    logFallbackReason(reason);
     console.warn(
-      `[interview] xAI question generation failed. Using fallback questions. ${error.message}`
+      `[interview] xAI question generation failed. Using fallback questions. ${reason}`
     );
-    return buildFallbackQuestions(options);
+    const fallbackQuestions = buildFallbackQuestions(options);
+    fallbackQuestions.forEach((question) => logQuestionSelection(options, question));
+    return fallbackQuestions;
   }
 }
 
@@ -566,10 +744,12 @@ async function createSessionStore(session) {
       questionId: question.questionId,
       number: question.number,
       text: question.text,
+      source: normalizeQuestionSource(question.source, "unknown"),
       answer: "",
       skipped: false,
       feedback: null,
       answeredAt: null,
+      createdAt: timestamp,
     });
   }
 
@@ -594,10 +774,12 @@ async function readFirestoreSession(sessionId) {
       questionId: question.questionId,
       number: Number(question.number),
       text: question.text || "",
+      source: normalizeQuestionSource(question.source, "firestore"),
       answer: question.answer || "",
       skipped: Boolean(question.skipped),
       feedback: question.feedback || null,
       answeredAt: toIso(question.answeredAt),
+      createdAt: toIso(question.createdAt),
     }));
 
   return {
@@ -683,12 +865,16 @@ async function saveSessionState(session) {
         questionId: question.questionId,
         number: question.number,
         text: question.text,
+        source: normalizeQuestionSource(question.source, "unknown"),
         answer: question.answer,
         skipped: question.skipped,
         feedback: question.feedback,
         answeredAt: question.answeredAt
           ? admin.firestore.Timestamp.fromDate(new Date(question.answeredAt))
           : null,
+        createdAt: question.createdAt
+          ? admin.firestore.Timestamp.fromDate(new Date(question.createdAt))
+          : admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
@@ -703,6 +889,7 @@ function toPublicQuestion(question, total) {
     text: question.text,
     number: question.number,
     total,
+    source: normalizeQuestionSource(question.source, "unknown"),
   };
 }
 
@@ -1017,6 +1204,10 @@ function getRuntimeMode() {
     firestore: isFirestoreReady() ? "enabled" : "fallback-memory",
     xai: hasXaiConfig() ? "configured" : "fallback-local",
   };
+}
+
+function isDevelopmentEnvironment() {
+  return process.env.NODE_ENV !== "production";
 }
 
 module.exports = {

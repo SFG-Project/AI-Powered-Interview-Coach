@@ -15,6 +15,7 @@ export interface InterviewQuestion {
   text: string;
   number: number;
   total: number;
+  source?: "grok" | "fallback" | "firestore" | "unknown";
 }
 
 export interface InterviewStartResponse {
