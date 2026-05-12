@@ -1,357 +1,455 @@
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  AfterViewInit,
-  ElementRef,
-  ViewChild,
-  ChangeDetectorRef,
-} from "@angular/core";
 import { CommonModule } from "@angular/common";
+import { Component, OnDestroy, OnInit, inject } from "@angular/core";
+import { FormsModule } from "@angular/forms";
 import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
-import { DomSanitizer, SafeUrl } from "@angular/platform-browser";
+import {
+  InterviewFeedback,
+  InterviewQuestion,
+  InterviewService,
+  InterviewSetupPayload,
+} from "../../core/services/interview.service";
+import { environment } from "../../../environments/environment";
 
-interface Message {
-  type: 'ai' | 'user';
+type InterviewState =
+  | "setup"
+  | "loading"
+  | "active"
+  | "submitting"
+  | "aiTyping"
+  | "completed"
+  | "error";
+
+interface ChatMessage {
+  sender: "ai" | "user";
   content: string;
-  isQuestion?: boolean;
-  questionNumber?: number;
-  difficulty?: string;
-  isAudio?: boolean;
-  duration?: number;
-  audioUrl?: SafeUrl;
 }
+
+const PLACEHOLDER_FEEDBACK: InterviewFeedback = {
+  score: 7.5,
+  summary: "",
+  clarity: "Good",
+  technicalAccuracy: "Strong",
+  confidence: "Moderate",
+  communication: "Improving",
+  quickTip:
+    "A strong answer should have a definition, short explanation, and real example.",
+  sessionNotes:
+    "Try to sound more confident and expand your explanation before the example.",
+  strengths: [],
+  improvements: [],
+  suggestedAnswer: "",
+};
 
 @Component({
   selector: "app-interview-session-page",
   standalone: true,
-  imports: [CommonModule, SidebarComponent],
+  imports: [CommonModule, FormsModule, SidebarComponent],
   templateUrl: "./interview-session-page.component.html",
   styleUrls: ["./interview-session-page.component.css"],
 })
-export class InterviewSessionPageComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild("chatMessages") chatMessagesRef!: ElementRef;
+export class InterviewSessionPageComponent implements OnInit, OnDestroy {
+  private readonly interviewService = inject(InterviewService);
+  private timerHandle: ReturnType<typeof setInterval> | null = null;
+  private isAutoSkipping = false;
 
-  currentQuestionIndex = 1;
-  totalQuestions = 5;
-  timeLeft = 80;
-  isPaused = false;
-  isInterviewActive = true;
-  isTyping = false;
+  readonly careerFieldOptions = [
+    "Software Developer",
+    "Data Analyst",
+    "Business Analyst",
+    "Project Manager",
+    "Cybersecurity Analyst",
+    "Other",
+  ];
 
-  // Voice recording
-  isRecording = false;
-  recognition: any;
-  isVoiceSupported = false;
-  mediaRecorder: any;
-  audioChunks: Blob[] = [];
-  startTime: number = 0;
-  audioUrl: SafeUrl | null = null;
-  audioDuration: number = 0;
-  private recordedAudioBlob: Blob | null = null;
+  readonly interviewTypeOptions = ["Technical", "Behavioural", "HR", "Mixed"];
+  readonly difficultyOptions = ["Easy", "Medium", "Hard"];
+  readonly questionCountOptions = [3, 5, 10];
 
-  messages: Message[] = [];
+  state: InterviewState = "setup";
+  errorMessage = "";
+  completionSummary = "";
+
+  setupModel: InterviewSetupPayload = {
+    careerField: "Software Developer",
+    interviewType: "Technical",
+    difficulty: "Medium",
+    questionCount: 5,
+  };
+
+  sessionId = "";
+  currentQuestion: InterviewQuestion | null = null;
+  sessionQuestionCount = 0;
+  questionPointer = 0;
+  messages: ChatMessage[] = [];
   userAnswer = "";
+  isPaused = false;
+  timeLeft = 80;
+  evaluation = { ...PLACEHOLDER_FEEDBACK };
 
-  evaluationAreas = [
-    { name: "Clarity", status: "Good" },
-    { name: "Technical Accuracy", status: "Strong" },
-    { name: "Confidence", status: "Moderate" },
-    { name: "Communication", status: "Improving" },
-  ];
-
-  sessionNotes = 'Keep answers direct. Add practical examples. Avoid being too short.';
-
-  private timerInterval: any;
-
-  private questions = [
-    { text: "Explain polymorphism in object-oriented programming and give one practical example.", difficulty: "Medium" },
-    { text: "What are the differences between REST and GraphQL APIs?", difficulty: "Hard" },
-    { text: "How would you optimize a slow database query?", difficulty: "Hard" },
-    { text: "Explain the concept of closures in JavaScript.", difficulty: "Medium" },
-    { text: "Describe a time you had to resolve a technical conflict with a team member.", difficulty: "Easy" },
-  ];
-
-  constructor(private cdr: ChangeDetectorRef, private sanitizer: DomSanitizer) {}
+  userName = "Rorisang";
+  userInitial = "R";
 
   ngOnInit(): void {
-    this.initializeChat();
-    this.startTimer();
-    this.checkVoiceSupport();
-  }
-
-  ngAfterViewInit(): void {
-    this.scrollToBottom();
+    this.syncUserIdentity();
   }
 
   ngOnDestroy(): void {
-    if (this.timerInterval) clearInterval(this.timerInterval);
-    if (this.recognition) this.recognition.abort();
-    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-      this.mediaRecorder.stream?.getTracks().forEach((track: any) => track.stop());
+    this.stopTimer();
+  }
+
+  get hasSession(): boolean {
+    return Boolean(this.sessionId);
+  }
+
+  get currentQuestionNumber(): number {
+    return this.questionPointer;
+  }
+
+  get totalQuestions(): number {
+    if (this.currentQuestion?.total) {
+      return this.currentQuestion.total;
     }
-  }
 
-  checkVoiceSupport(): void {
-    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-      this.isVoiceSupported = true;
-      this.initSpeechRecognition();
+    if (this.sessionQuestionCount > 0) {
+      return this.sessionQuestionCount;
     }
+
+    return this.setupModel.questionCount;
   }
 
-  initSpeechRecognition(): void {
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    this.recognition = new SpeechRecognition();
-    this.recognition.interimResults = true;
-    this.recognition.lang = "en-US";
-    this.recognition.continuous = false;
+  get progressPercentage(): number {
+    if (!this.currentQuestion || !this.currentQuestion.total) {
+      return 0;
+    }
 
-    this.recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        }
-      }
-      if (finalTranscript) {
-        this.userAnswer = finalTranscript;
-        this.cdr.detectChanges();
-      }
-    };
+    return (
+      ((this.currentQuestion.number - 1) / this.currentQuestion.total) * 100
+    );
+  }
 
-    this.recognition.onerror = () => {
-      this.isRecording = false;
-      this.cdr.detectChanges();
-    };
+  get timerLabel(): string {
+    const minutes = Math.floor(this.timeLeft / 60);
+    const seconds = this.timeLeft % 60;
+    return `${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")} Left`;
+  }
 
-    this.recognition.onend = () => {
-      this.cdr.detectChanges();
+  get scoreLabel(): string {
+    return this.evaluation.score.toFixed(1);
+  }
+
+  get scoreRingStyle() {
+    const percentage = Math.max(0, Math.min(100, (this.evaluation.score / 10) * 100));
+    return {
+      background: `conic-gradient(#2d69f6 ${percentage}%, #d4dbea ${percentage}% 100%)`,
     };
   }
 
-  async startVoiceInput() {
-    if (this.isRecording) {
-      this.stopRecordingAndSend();
+  get isBusy(): boolean {
+    return this.state === "loading" || this.state === "submitting" || this.state === "aiTyping";
+  }
+
+  onSetupChange(field: keyof InterviewSetupPayload, event: Event): void {
+    const target = event.target as HTMLSelectElement | null;
+    if (!target) {
       return;
     }
 
-    this.userAnswer = '';
-    this.audioUrl = null;
-    this.recordedAudioBlob = null;
-    this.isRecording = true;
-    this.cdr.detectChanges();
+    if (field === "questionCount") {
+      this.setupModel.questionCount = Number(target.value) || 5;
+      return;
+    }
 
-    if (this.recognition) {
-      try { this.recognition.start(); } catch {}
+    if (field === "careerField" || field === "interviewType" || field === "difficulty") {
+      this.setupModel[field] = target.value;
+    }
+  }
+
+  async startInterview(): Promise<void> {
+    this.state = "loading";
+    this.errorMessage = "";
+    this.completionSummary = "";
+    const startPayload: InterviewSetupPayload = {
+      careerField: this.setupModel.careerField,
+      interviewType: this.setupModel.interviewType,
+      difficulty: this.setupModel.difficulty,
+      questionCount: Number(this.setupModel.questionCount),
+    };
+
+    if (!environment.production) {
+      console.info("[interview/start] setup payload:", startPayload);
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.mediaRecorder = new MediaRecorder(stream);
-      this.audioChunks = [];
-
-      this.mediaRecorder.ondataavailable = (event: any) => {
-        if (event.data.size > 0) this.audioChunks.push(event.data);
-      };
-
-      this.mediaRecorder.onstop = () => {
-        this.recordedAudioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-        const audioObjectUrl = URL.createObjectURL(this.recordedAudioBlob);
-        this.audioUrl = this.sanitizer.bypassSecurityTrustUrl(audioObjectUrl);
-        this.audioDuration = Math.floor((Date.now() - this.startTime) / 1000);
-        stream.getTracks().forEach(track => track.stop());
-        this.cdr.detectChanges();
-        this.dispatchMessage();
-      };
-
-      this.startTime = Date.now();
-      this.mediaRecorder.start();
-    } catch {
-      alert('Could not access microphone. Please check permissions.');
-      this.isRecording = false;
-      this.cdr.detectChanges();
+      const response = await this.interviewService.startInterview(startPayload);
+      this.sessionId = response.sessionId;
+      this.currentQuestion = response.question;
+      this.sessionQuestionCount = response.question.total;
+      this.questionPointer = response.question.number;
+      this.logQuestionSource(response.question.source);
+      this.evaluation = { ...PLACEHOLDER_FEEDBACK };
+      this.messages = [
+        {
+          sender: "ai",
+          content: `Hello ${this.userName}. Welcome to your mock interview.`,
+        },
+        {
+          sender: "ai",
+          content: response.question.text,
+        },
+      ];
+      this.userAnswer = "";
+      this.isPaused = false;
+      this.timeLeft = 80;
+      this.startTimer();
+      this.state = "active";
+    } catch (error) {
+      this.errorMessage = this.toErrorMessage(error);
+      this.state = "error";
     }
   }
 
-  stopRecordingAndSend(): void {
-    if (this.recognition) {
-      try { this.recognition.stop(); } catch {}
+  onAnswerInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (!target) {
+      return;
     }
-
-    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-      this.mediaRecorder.stop();
-    } else {
-      this.isRecording = false;
-      this.cdr.detectChanges();
-      this.dispatchMessage();
-    }
-
-    this.isRecording = false;
-    this.cdr.detectChanges();
+    this.userAnswer = target.value;
   }
 
-  dispatchMessage(): void {
-    const hasText = this.userAnswer.trim().length > 0;
-    const hasAudio = !!this.recordedAudioBlob && !!this.audioUrl;
-
-    if (!hasText && !hasAudio) return;
-
-    if (this.messages.length > 0 && this.messages[this.messages.length - 1].isQuestion) {
-      this.messages.pop();
+  async sendAnswer(): Promise<void> {
+    if (!this.currentQuestion || !this.sessionId || !this.userAnswer.trim()) {
+      return;
     }
 
-    if (hasText) {
-      this.messages.push({ type: "user", content: this.userAnswer });
-    }
-
-    if (hasAudio) {
-      this.messages.push({
-        type: "user",
-        content: "Audio recording",
-        isAudio: true,
-        duration: this.audioDuration,
-        audioUrl: this.audioUrl!,
-      });
-    }
-
+    const answer = this.userAnswer.trim();
+    this.messages.push({ sender: "user", content: answer });
     this.userAnswer = "";
-    this.audioUrl = null;
-    this.recordedAudioBlob = null;
-    this.audioDuration = 0;
 
-    this.scrollToBottom();
-    this.queueNextQuestion();
-    this.cdr.detectChanges();
+    await this.handleQuestionProgress(async () =>
+      this.interviewService.submitAnswer(this.sessionId, {
+        questionId: this.currentQuestion!.id,
+        answer,
+        skipped: false,
+      })
+    );
   }
 
-  sendMessage(): void {
-    if (!this.userAnswer.trim()) return;
-    this.dispatchMessage();
-  }
-
-  initializeChat(): void {
-    this.messages = [
-      { type: "ai", content: "Hello Rorisang. Welcome to your AI mock interview." },
-      {
-        type: "ai",
-        content: this.questions[0].text,
-        isQuestion: true,
-        questionNumber: 1,
-        difficulty: this.questions[0].difficulty,
-      },
-    ];
-    this.currentQuestionIndex = 1;
-  }
-
-  queueNextQuestion(): void {
-    this.isTyping = true;
-    this.scrollToBottom();
-
-    setTimeout(() => {
-      this.isTyping = false;
-
-      if (this.currentQuestionIndex < this.totalQuestions) {
-        const next = this.questions[this.currentQuestionIndex];
-        this.messages.push({
-          type: "ai",
-          content: next.text,
-          isQuestion: true,
-          questionNumber: this.currentQuestionIndex + 1,
-          difficulty: next.difficulty,
-        });
-        this.currentQuestionIndex++;
-        this.timeLeft = 80;
-      } else if (this.currentQuestionIndex === this.totalQuestions) {
-        this.messages.push({
-          type: "ai",
-          content: "🎉 Congratulations! You've completed all questions!",
-        });
-        this.isInterviewActive = false;
-        if (this.timerInterval) clearInterval(this.timerInterval);
-      }
-      this.scrollToBottom();
-    }, 1000);
-  }
-
-  updateUserAnswer(event: Event): void {
-    this.userAnswer = (event.target as HTMLInputElement).value;
-  }
-
-  startTimer(): void {
-    this.timerInterval = setInterval(() => {
-      if (!this.isPaused && this.isInterviewActive && this.timeLeft > 0) {
-        this.timeLeft--;
-        if (this.timeLeft === 0) this.autoNextQuestion();
-      }
-    }, 1000);
-  }
-
-  autoNextQuestion(): void {
-    if (this.isInterviewActive && this.currentQuestionIndex < this.totalQuestions) {
-      if (this.messages.length > 0 && this.messages[this.messages.length - 1].isQuestion) {
-        this.messages.pop();
-      }
-      this.messages.push({ type: "user", content: "Time's up! Moving to next question." });
-      this.queueNextQuestion();
+  async nextQuestion(): Promise<void> {
+    if (!this.currentQuestion || !this.sessionId) {
+      return;
     }
+
+    this.messages.push({
+      sender: "user",
+      content: "Skipped this question. Moving to next one.",
+    });
+
+    await this.handleQuestionProgress(async () =>
+      this.interviewService.skipQuestion(this.sessionId, {
+        questionId: this.currentQuestion!.id,
+      })
+    );
   }
 
-  formatTime(): string {
-    const minutes = Math.floor(this.timeLeft / 60);
-    const seconds = this.timeLeft % 60;
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  async endInterview(): Promise<void> {
+    if (!this.sessionId || this.isBusy || this.state === "completed") {
+      return;
+    }
+
+    this.state = "loading";
+    this.errorMessage = "";
+
+    try {
+      const result = await this.interviewService.endInterview(this.sessionId);
+      this.completionSummary = result.summary;
+      this.messages.push({
+        sender: "ai",
+        content:
+          "Interview session ended. You can review your progress in Feedback Reports.",
+      });
+      this.stopTimer();
+      this.state = "completed";
+    } catch (error) {
+      this.errorMessage = this.toErrorMessage(error);
+      this.state = "error";
+    }
   }
 
   togglePause(): void {
+    if (this.state !== "active") {
+      return;
+    }
+
     this.isPaused = !this.isPaused;
   }
 
-  skipQuestion(): void {
-    if (this.currentQuestionIndex < this.totalQuestions) {
-      if (this.messages.length > 0 && this.messages[this.messages.length - 1].isQuestion) {
-        this.messages.pop();
+  async resetToSetup(): Promise<void> {
+    this.stopTimer();
+    this.sessionId = "";
+    this.currentQuestion = null;
+    this.sessionQuestionCount = 0;
+    this.questionPointer = 0;
+    this.messages = [];
+    this.userAnswer = "";
+    this.errorMessage = "";
+    this.completionSummary = "";
+    this.evaluation = { ...PLACEHOLDER_FEEDBACK };
+    this.timeLeft = 80;
+    this.isPaused = false;
+    this.state = "setup";
+  }
+
+  private async handleQuestionProgress(
+    submitAction: () => Promise<{
+      feedback: InterviewFeedback;
+      nextQuestion: InterviewQuestion | null;
+      isComplete: boolean;
+    }>
+  ): Promise<void> {
+    if (!this.currentQuestion) {
+      return;
+    }
+
+    this.errorMessage = "";
+    this.state = "submitting";
+    await Promise.resolve();
+    this.state = "aiTyping";
+
+    try {
+      const response = await submitAction();
+      this.evaluation = response.feedback;
+
+      if (response.feedback.summary) {
+        this.messages.push({
+          sender: "ai",
+          content: response.feedback.summary,
+        });
       }
-      const nextQuestion = this.questions[this.currentQuestionIndex];
+
+      if (response.isComplete || !response.nextQuestion) {
+        this.questionPointer = this.totalQuestions;
+        this.currentQuestion = null;
+        this.messages.push({
+          sender: "ai",
+          content: "Interview completed. Great effort today.",
+        });
+        this.stopTimer();
+        this.state = "completed";
+        return;
+      }
+
+      this.currentQuestion = response.nextQuestion;
+      this.sessionQuestionCount = response.nextQuestion.total;
+      this.questionPointer = response.nextQuestion.number;
+      this.logQuestionSource(response.nextQuestion.source);
       this.messages.push({
-        type: 'ai',
-        content: nextQuestion.text,
-        isQuestion: true,
-        questionNumber: this.currentQuestionIndex + 1,
-        difficulty: nextQuestion.difficulty
+        sender: "ai",
+        content: response.nextQuestion.text,
       });
-      this.currentQuestionIndex++;
       this.timeLeft = 80;
-      this.scrollToBottom();
+      this.isPaused = false;
+      this.state = "active";
+    } catch (error) {
+      this.errorMessage = this.toErrorMessage(error);
+      this.state = "error";
     }
   }
 
-  endInterview(): void {
-    if (confirm('Are you sure you want to end this interview session?')) {
-      this.isInterviewActive = false;
-      if (this.timerInterval) {
-        clearInterval(this.timerInterval);
+  private startTimer(): void {
+    this.stopTimer();
+
+    this.timerHandle = setInterval(() => {
+      if (this.state !== "active" || this.isPaused) {
+        return;
       }
-      this.messages.push({
-        type: 'ai',
-        content: "Interview session ended. You can review your answers in the Reports section."
-      });
+
+      if (this.timeLeft > 0) {
+        this.timeLeft -= 1;
+      }
+
+      if (this.timeLeft === 0 && !this.isAutoSkipping) {
+        this.isAutoSkipping = true;
+        this.nextQuestion().finally(() => {
+          this.isAutoSkipping = false;
+        });
+      }
+    }, 1000);
+  }
+
+  private stopTimer(): void {
+    if (this.timerHandle) {
+      clearInterval(this.timerHandle);
+      this.timerHandle = null;
     }
   }
 
-  scrollToBottom(): void {
-    setTimeout(() => {
-      if (this.chatMessagesRef) {
-        this.chatMessagesRef.nativeElement.scrollTop = this.chatMessagesRef.nativeElement.scrollHeight;
+  private syncUserIdentity(): void {
+    const authName = "";
+    const authEmail = "";
+    let tokenName = "";
+    let tokenEmail = "";
+
+    try {
+      const rawToken = sessionStorage.getItem("authToken");
+      if (rawToken) {
+        const payloadSegment = rawToken.split(".")[1];
+        if (payloadSegment) {
+          const normalized = payloadSegment
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+          const padded = normalized.padEnd(
+            Math.ceil(normalized.length / 4) * 4,
+            "="
+          );
+          const decoded = JSON.parse(
+            atob(padded)
+          ) as { name?: string; email?: string };
+          tokenName = typeof decoded.name === "string" ? decoded.name.trim() : "";
+          tokenEmail = typeof decoded.email === "string" ? decoded.email.trim() : "";
+        }
       }
-    }, 100);
+    } catch {
+      // Ignore token parsing failures and keep defaults.
+    }
+
+    const fallbackFromEmail = (authEmail || tokenEmail).includes("@")
+      ? (authEmail || tokenEmail).split("@")[0]
+      : "";
+    const resolvedName = authName || tokenName || fallbackFromEmail || "Rorisang";
+
+    this.userName = resolvedName;
+    this.userInitial = resolvedName.charAt(0).toUpperCase() || "R";
   }
 
-  getProgressPercentage(): number {
-    return (this.currentQuestionIndex / this.totalQuestions) * 100;
+  private toErrorMessage(error: unknown): string {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "error" in error &&
+      typeof (error as { error?: unknown }).error === "object"
+    ) {
+      const nested = (error as { error?: { message?: unknown } }).error;
+      if (nested && typeof nested.message === "string" && nested.message.trim()) {
+        return nested.message.trim();
+      }
+    }
+
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    return "Something went wrong while processing the interview request.";
   }
 
-  playAudio(audioUrl: SafeUrl): void {
-    const audio = new Audio(audioUrl.toString());
-    audio.play();
+  private logQuestionSource(source: string | undefined): void {
+    if (environment.production) {
+      return;
+    }
+
+    const normalizedSource =
+      typeof source === "string" && source.trim() ? source.trim() : "unknown";
+    console.info(`[interview] Question source: ${normalizedSource}`);
   }
 }

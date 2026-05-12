@@ -1,18 +1,20 @@
 import { CommonModule } from "@angular/common";
 import { Component, Input } from "@angular/core";
-import { RouterLink } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
+import { AuthService } from '../../../core/services/auth.service';
 
 type SidebarItemKey =
   | "interview-session"
   | "dashboard"
   | "progress"
   | "feedback-reports"
-  | "settings";
+  | "settings"
+  | "sign-out";
 
 interface SidebarNavItem {
   key: SidebarItemKey;
   label: string;
-  route: string;
+  route?: string;
 }
 
 @Component({
@@ -24,6 +26,9 @@ interface SidebarNavItem {
 })
 export class SidebarComponent {
   @Input() activeItem: SidebarItemKey = "dashboard";
+
+  constructor(private authService: AuthService, private router: Router) {}
+
   readonly interviewSessionRoute = "/interview-session";
 
   readonly navItems: SidebarNavItem[] = [
@@ -35,5 +40,15 @@ export class SidebarComponent {
       route: "/feedback-reports",
     },
     { key: "settings", label: "Settings", route: "/settings" },
+    { key: "sign-out", label: "Sign Out" },
   ];
+
+  onNavItemClick(item: SidebarNavItem): void {
+    if (item.key === "sign-out") {
+      this.authService.logout();
+      this.router.navigate(["/signin"]);
+    } else if (item.route) {
+      this.router.navigate([item.route]);
+    }
+  }
 }

@@ -12,3 +12,100 @@ body {
   min-height: 100vh;
   background: #f8fafc;
 }
+
+.interview-content .score-card,
+.interview-content .metric-row,
+.interview-content .info-card {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.interview-content .score-card {
+  background: #f3f5f9;
+}
+
+.interview-content .score-card p {
+  color: #64748b;
+}
+
+.interview-content .metric-row {
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+}
+
+.interview-content .metric-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.interview-content .info-card h4 {
+  color: #0f172a;
+}
+
+.interview-content .info-card p {
+  color: #475569;
+}
+
+.interview-content .state-message {
+  margin: 0 0 10px;
+  color: #334155;
+}
+
+.interview-content .state-message.error {
+  color: #b91c1c;
+}
+
+.interview-content .action-row,
+.interview-content .completion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.interview-content .completion-row p {
+  color: #334155;
+}
+
+.interview-content .btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.interview-content .btn:disabled,
+.interview-content .mic-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.interview-content .btn-primary {
+  background: #2d69f6;
+}
+
+.interview-content .btn-warning {
+  background: #f59e0b;
+}
+
+.interview-content .btn-success {
+  background: #22c55e;
+}
+
+.interview-content .btn-danger {
+  background: #ef4444;
+}

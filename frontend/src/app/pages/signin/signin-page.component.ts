@@ -63,7 +63,7 @@ export class SignInPageComponent {
     this.isSubmitting = true;
 
     try {
-      await this.authService.signIn(this.email.trim(), this.password);
+      await this.authService.signIn(this.email.trim().toLowerCase(), this.password);
       await this.router.navigateByUrl("/dashboard");
     } catch (error) {
       this.authError = this.authService.getSignInErrorMessage(error);

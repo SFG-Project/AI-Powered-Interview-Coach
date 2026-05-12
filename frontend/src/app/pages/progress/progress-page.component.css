@@ -1,35 +1,166 @@
-.placeholder-page {
+.progress-page {
   min-height: 100vh;
   background: #e9edf3;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
-.placeholder-content {
+.progress-content {
+  padding: 20px 16px;
+}
+
+.progress-content h1 {
+  margin: 0;
+  color: #0b1324;
+  font-size: clamp(1.9rem, 4vw, 2.4rem);
+}
+
+.overview-card,
+.panel,
+.status-card {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #d8dee8;
+  box-shadow: 0 1px 2px rgba(10, 25, 47, 0.06);
+}
+
+.overview-card {
+  margin-top: 12px;
   padding: 24px 18px;
 }
 
-.placeholder-content h1 {
+.overview-card h2 {
   margin: 0;
   color: #0b1324;
-  font-size: clamp(2rem, 4vw, 2.3rem);
+  font-size: 2rem;
 }
 
-.placeholder-card {
+.overview-card p {
+  margin: 10px 0 0;
+  color: #2b3546;
+  font-size: 1.05rem;
+}
+
+.status-card {
   margin-top: 12px;
-  background: #ffffff;
-  border-radius: 10px;
   padding: 22px 18px;
+  color: #233044;
+  font-size: 1rem;
 }
 
-.placeholder-card p {
+.status-card-error {
+  color: #8a1c1c;
+}
+
+.progress-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+}
+
+.panel {
+  padding: 24px 18px;
+}
+
+.panel h2 {
   margin: 0;
-  color: #313b49;
-  font-size: 1.15rem;
+  color: #0b1324;
+  font-size: 2rem;
+}
+
+.skill-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+.skill-row {
+  display: grid;
+  gap: 8px;
+}
+
+.skill-name {
+  margin: 0;
+  color: #111f34;
+  font-size: 1.14rem;
+  font-weight: 600;
+}
+
+.skill-track {
+  height: 11px;
+  background: #d7dbe3;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.skill-fill {
+  display: block;
+  height: 100%;
+  background: #2d69f6;
+}
+
+.skill-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbe8ff;
+  color: #2d69f6;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.score-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.score-row {
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 10px;
+  background: #f2f4f8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.score-label {
+  color: #1d2940;
+  font-size: 1.02rem;
+}
+
+.score-pill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #dbe8ff;
+  color: #2d69f6;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.empty-copy {
+  margin: 16px 0 0;
+  color: #2f3b4d;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 1120px) {
+  .progress-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
-  .placeholder-page {
+  .progress-page {
     grid-template-columns: 1fr;
+  }
+
+  .progress-content {
+    padding: 16px;
   }
 }

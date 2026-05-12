@@ -1,11 +1,48 @@
-<main class="placeholder-page">
+<main class="feedback-reports-page">
   <app-sidebar [activeItem]="'feedback-reports'"></app-sidebar>
 
-  <section class="placeholder-content">
+  <section class="feedback-reports-content">
     <h1>Feedback Reports</h1>
 
-    <article class="placeholder-card">
-      <p>This page is under construction.</p>
+    <article class="overview-card">
+      <h2>Previous Reports</h2>
+      <p>Review your interview performance and improvement suggestions.</p>
     </article>
+
+    <article class="status-card" *ngIf="state === 'loading'">
+      Loading feedback reports...
+    </article>
+
+    <article class="status-card status-card-error" *ngIf="state === 'error'">
+      Could not load feedback reports right now.
+    </article>
+
+    <article class="status-card" *ngIf="state === 'empty'">
+      No feedback reports yet. Complete an interview session to generate feedback.
+    </article>
+
+    <section class="report-list" *ngIf="state === 'ready'">
+      <article class="report-card" *ngFor="let report of reports">
+        <h3>{{ report.title }}</h3>
+
+        <p class="report-line"><strong>Score:</strong> {{ report.score | number: '1.0-1' }}/{{ report.maxScore }}</p>
+        <p class="report-line"><strong>Strengths:</strong> {{ formatList(report.strengths) }}</p>
+        <p class="report-line"><strong>Weaknesses:</strong> {{ formatList(report.weaknesses) }}</p>
+        <p class="report-line"><strong>Suggestion:</strong> {{ formatList(report.suggestions) }}</p>
+        <p class="report-summary">{{ report.summary }}</p>
+
+        <details class="report-details" *ngIf="report.questions.length > 0">
+          <summary>Question Details</summary>
+
+          <article class="question-card" *ngFor="let question of report.questions">
+            <p><strong>Question {{ question.number }}:</strong> {{ question.question }}</p>
+            <p><strong>Your Answer:</strong> {{ question.answer }}</p>
+            <p><strong>Score:</strong> {{ question.score | number: '1.0-1' }}/10</p>
+            <p><strong>Feedback:</strong> {{ question.feedbackSummary }}</p>
+            <p><strong>Suggested Answer:</strong> {{ question.suggestedAnswer }}</p>
+          </article>
+        </details>
+      </article>
+    </section>
   </section>
 </main>

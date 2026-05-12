@@ -1,6 +1,7 @@
-import { Injectable } from "@angular/core";
-import { doc, getDoc } from "firebase/firestore";
-import { firestoreDb } from "../firebase";
+import { HttpClient } from "@angular/common/http";
+import { Injectable, inject } from "@angular/core";
+import { environment } from "../../../environments/environment";
+import { firstValueFrom } from "rxjs";
 
 export type FirestoreConnectionStatus =
   | "idle"
@@ -15,76 +16,88 @@ export interface FirestoreConnectionResult {
   errorMessage?: string;
 }
 
-const CONNECTIVITY_TEST_COLLECTION = "healthChecks";
-const CONNECTIVITY_TEST_DOCUMENT_ID = "landingPageConnectivityProbe";
-
 @Injectable({ providedIn: "root" })
 export class FirestoreHealthService {
+  private readonly http = inject(HttpClient);
+
   async checkConnection(): Promise<FirestoreConnectionResult> {
     try {
-      await getDoc(
-        doc(
-          firestoreDb,
-          CONNECTIVITY_TEST_COLLECTION,
-          CONNECTIVITY_TEST_DOCUMENT_ID
+      const response = await firstValueFrom(
+        this.http.get<Record<string, unknown>>(
+          `${environment.apiBaseUrl}/api/firestore/health`
         )
       );
-      return { status: "connected" };
+      const status = this.extractStatus(response["status"]);
+      return { status };
     } catch (error: unknown) {
-      const firebaseError = this.toFirebaseError(error);
-      const status = this.mapErrorCodeToStatus(firebaseError.code);
+      const requestError = this.toRequestError(error);
+      const status = this.extractStatus(requestError.status);
+      const errorCode = requestError.errorCode;
+      const errorMessage = requestError.errorMessage;
 
-      console.error("[firebase] Firestore connectivity check failed.", {
+      console.error("[backend-api] Firestore connectivity check failed.", {
         status,
-        code: firebaseError.code ?? "unknown",
-        message: firebaseError.message,
+        code: errorCode ?? "unknown",
+        message: errorMessage,
       });
 
       return {
         status,
-        errorCode: firebaseError.code,
-        errorMessage: firebaseError.message,
+        errorCode,
+        errorMessage,
       };
     }
   }
 
-  private mapErrorCodeToStatus(
-    code: string | undefined
-  ): FirestoreConnectionStatus {
-    if (code === "permission-denied" || code === "unauthenticated") {
-      return "read-blocked";
-    }
-
+  private extractStatus(value: unknown): FirestoreConnectionStatus {
     if (
-      code === "invalid-argument" ||
-      code === "invalid-api-key" ||
-      code === "failed-precondition"
+      value === "connected" ||
+      value === "read-blocked" ||
+      value === "config-error" ||
+      value === "request-failed" ||
+      value === "idle"
     ) {
-      return "config-error";
+      return value;
     }
 
     return "request-failed";
   }
 
-  private toFirebaseError(error: unknown): {
-    code: string | undefined;
-    message: string;
+  private toRequestError(error: unknown): {
+    status: unknown;
+    errorCode: string | undefined;
+    errorMessage: string;
   } {
-    if (error instanceof Error) {
-      const code =
-        typeof (error as { code?: unknown }).code === "string"
-          ? ((error as { code?: string }).code as string)
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "error" in error &&
+      typeof (error as { error?: unknown }).error === "object" &&
+      (error as { error?: unknown }).error !== null
+    ) {
+      const payload = (error as { error: Record<string, unknown> }).error;
+      const status =
+        typeof payload["status"] === "string" ? payload["status"] : undefined;
+      const errorCode =
+        typeof payload["errorCode"] === "string"
+          ? payload["errorCode"]
           : undefined;
+      const errorMessage =
+        typeof payload["errorMessage"] === "string"
+          ? payload["errorMessage"]
+          : "Backend health request failed.";
 
       return {
-        code,
-        message: error.message,
+        status,
+        errorCode,
+        errorMessage,
       };
     }
 
     return {
-      code: undefined,
-      message: "Unknown Firestore error.",
+      status: "request-failed",
+      errorCode: undefined,
+      errorMessage: error instanceof Error ? error.message : "Unknown backend API error.",
     };
   }
 }
