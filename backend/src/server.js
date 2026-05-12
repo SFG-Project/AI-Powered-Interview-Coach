@@ -54,6 +54,8 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.post("/api/auth/signup", async (req, res) => {
+  logSignUpRouteHit(req);
+
   const payload = req.body;
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     res.status(400).json({ message: "Signup payload must be a JSON object." });
@@ -116,6 +118,7 @@ app.post("/api/auth/signup", async (req, res) => {
         { merge: true }
       );
 
+    logSignUpSuccess(email, createdUser.uid);
     res.status(201).json({ id: createdUser.uid });
   } catch (error) {
     if (createdUser?.uid) {
@@ -127,6 +130,7 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 
     const normalizedError = normalizeAuthError(error);
+    logSignUpFailure(email, normalizedError.code);
     res.status(normalizedError.httpStatus).json({
       errorCode: normalizedError.code,
       message: normalizedError.message,
@@ -205,6 +209,7 @@ app.post("/api/auth/signin", async (req, res) => {
       return;
     }
 
+    logSignInSuccess(normalizedEmail);
     res.json({
       idToken: getTrimmedString(body.idToken),
       refreshToken: getTrimmedString(body.refreshToken),
@@ -559,6 +564,8 @@ app.put("/api/users/:userId", async (req, res) => {
     });
   }
 });
+
+logAuthRouteRegistration();
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Backend server listening on http://localhost:${PORT}`);
@@ -1023,13 +1030,38 @@ function logSignInFailure({ email, normalizedErrorCode, providerErrorCode, detai
   );
 }
 
-function logSignInRouteHit(req) {
-  if (!isDevelopmentEnvironment()) {
-    return;
-  }
+function logAuthRouteRegistration() {
+  console.info(
+    "[startup] Registered auth routes: POST /api/auth/signup, POST /api/auth/signin."
+  );
+}
 
+function logSignUpRouteHit(req) {
+  const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
+  console.info(`[auth/signup] ${req.method} ${req.path} hit from ${origin}`);
+}
+
+function logSignUpSuccess(email, uid) {
+  const maskedEmail = maskEmail(email);
+  const hasUid = typeof uid === "string" && Boolean(uid.trim());
+  console.info(`[auth/signup] Success for ${maskedEmail}. uidCreated=${hasUid}.`);
+}
+
+function logSignUpFailure(email, normalizedErrorCode) {
+  const maskedEmail = maskEmail(email);
+  console.warn(
+    `[auth/signup] Failed for ${maskedEmail}. normalizedErrorCode=${normalizedErrorCode || "unknown"}.`
+  );
+}
+
+function logSignInRouteHit(req) {
   const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
   console.info(`[auth/signin] ${req.method} ${req.path} hit from ${origin}`);
+}
+
+function logSignInSuccess(email) {
+  const maskedEmail = maskEmail(email);
+  console.info(`[auth/signin] Success for ${maskedEmail}.`);
 }
 
 function logProgressRouteHit(uid) {

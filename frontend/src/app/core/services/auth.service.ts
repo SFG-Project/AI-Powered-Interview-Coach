@@ -21,9 +21,10 @@ interface AuthErrorDetails {
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokenKey = "authToken";
+  private readonly authApiBaseUrl = this.buildAuthApiBaseUrl();
 
   async signIn(email: string, password: string): Promise<void> {
-    const signInUrl = `${environment.apiBaseUrl}/api/auth/signin`;
+    const signInUrl = `${this.authApiBaseUrl}/signin`;
     this.logSignInRequestUrl(signInUrl);
 
     try {
@@ -60,9 +61,7 @@ export class AuthService {
   }
 
   async signUp(payload: SignUpPayload): Promise<void> {
-    await firstValueFrom(
-      this.http.post<{ id: string }>(`${environment.apiBaseUrl}/api/auth/signup`, payload)
-    );
+    await firstValueFrom(this.http.post<{ id: string }>(`${this.authApiBaseUrl}/signup`, payload));
   }
 
   getSignInErrorMessage(error: unknown): string {
@@ -209,5 +208,10 @@ export class AuthService {
       errorCode: details.code ?? null,
       errorMessage: details.message ?? null,
     });
+  }
+
+  private buildAuthApiBaseUrl(): string {
+    const trimmedBaseUrl = environment.apiBaseUrl.trim().replace(/\/+$/, "");
+    return trimmedBaseUrl ? `${trimmedBaseUrl}/api/auth` : "/api/auth";
   }
 }
