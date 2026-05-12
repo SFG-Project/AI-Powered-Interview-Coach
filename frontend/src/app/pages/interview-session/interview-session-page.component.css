@@ -232,3 +232,31 @@
   .send-btn,
   .mic-btn { width: 100%; }
 }
+
+@media (max-width: 850px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+
+  .page {
+    padding: 18px;
+  }
+
+  .bubble {
+    max-width: 90%;
+  }
+}
+
+@media (max-width: 600px) {
+  .input-row {
+    flex-wrap: wrap;
+  }
+
+  .send-btn {
+    width: 100%;
+  }
+}

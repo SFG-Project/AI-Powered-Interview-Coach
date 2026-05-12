@@ -4,9 +4,7 @@
 
     <section class="hero">
       <div class="hero-media" aria-hidden="true">
-        <div class="media-figure">
-          <span>Hero Image</span>
-        </div>
+        <img class="hero-img" src="assets/assets.png" alt="AI Interview Coach" />
       </div>
 
       <div class="hero-content">
@@ -32,9 +30,9 @@
 
     <p class="status-note">
       {{
-        backendApiConfigured
-          ? "Backend API URL configured."
-          : "Backend API URL is missing."
+      backendApiConfigured
+      ? "Backend API URL configured."
+      : "Backend API URL is missing."
       }}
     </p>
     <p class="status-note">{{ firestoreStatusMessage }}</p>
