@@ -4,68 +4,70 @@
   <section class="dashboard-content">
     <h1>Dashboard</h1>
 
-    <article class="status-card" *ngIf="state === 'loading'">Loading dashboard...</article>
+    <app-dashboard-skeleton *ngIf="state === 'loading'"></app-dashboard-skeleton>
 
-    <article class="status-card status-card-error" *ngIf="state === 'error'">
-      Could not load dashboard data right now.
-    </article>
-
-    <section class="summary-grid" aria-label="Dashboard summary cards">
-      <article class="summary-card" *ngFor="let card of summaryCards">
-        <p class="summary-label">{{ card.label }}</p>
-        <p class="summary-value">{{ card.value }}</p>
+    <ng-container *ngIf="state !== 'loading'">
+      <article class="status-card status-card-error" *ngIf="state === 'error'">
+        Could not load dashboard data right now.
       </article>
-    </section>
 
-    <section class="welcome-card">
-      <h2>{{ welcomeTitle }}</h2>
-      <p>{{ welcomeMessage }}</p>
+      <section class="summary-grid" aria-label="Dashboard summary cards">
+        <article class="summary-card" *ngFor="let card of summaryCards">
+          <p class="summary-label">{{ card.label }}</p>
+          <p class="summary-value">{{ card.value }}</p>
+        </article>
+      </section>
 
-      <div class="welcome-actions">
-        <button
-          type="button"
-          class="btn btn-primary"
-          routerLink="/interview-session"
-        >
-          Start Interview
-        </button>
-        <button type="button" class="btn btn-success" routerLink="/progress">
-          View Progress
-        </button>
-        <button type="button" class="btn btn-danger" routerLink="/feedback-reports">
-          View Reports
-        </button>
-      </div>
-    </section>
+      <section class="welcome-card">
+        <h2>{{ welcomeTitle }}</h2>
+        <p>{{ welcomeMessage }}</p>
 
-    <section class="table-card">
-      <h2>Recent Interviews</h2>
+        <div class="welcome-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            routerLink="/interview-session"
+          >
+            Start Interview
+          </button>
+          <button type="button" class="btn btn-success" routerLink="/progress">
+            View Progress
+          </button>
+          <button type="button" class="btn btn-danger" routerLink="/feedback-reports">
+            View Reports
+          </button>
+        </div>
+      </section>
 
-      <div class="table-wrap">
-        <table *ngIf="recentInterviews.length > 0; else emptyRecentInterviewsState">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Role</th>
-              <th>Type</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of recentInterviews">
-              <td>{{ row.date }}</td>
-              <td>{{ row.role }}</td>
-              <td>{{ row.type }}</td>
-              <td>{{ row.score }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <ng-template #emptyRecentInterviewsState>
-        <p class="empty-copy">
-          No completed interviews yet. Start an interview to see your history here.
-        </p>
-      </ng-template>
-    </section>
+      <section class="table-card">
+        <h2>Recent Interviews</h2>
+
+        <div class="table-wrap">
+          <table *ngIf="recentInterviews.length > 0; else emptyRecentInterviewsState">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Role</th>
+                <th>Type</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of recentInterviews">
+                <td>{{ row.date }}</td>
+                <td>{{ row.role }}</td>
+                <td>{{ row.type }}</td>
+                <td>{{ row.score }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #emptyRecentInterviewsState>
+          <p class="empty-copy">
+            No completed interviews yet. Start an interview to see your history here.
+          </p>
+        </ng-template>
+      </section>
+    </ng-container>
   </section>
 </main>

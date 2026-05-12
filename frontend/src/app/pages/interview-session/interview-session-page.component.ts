@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, OnDestroy, OnInit, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
+import { AppLoaderComponent } from "../../shared/components/app-loader/app-loader.component";
 import {
   InterviewFeedback,
   InterviewQuestion,
@@ -43,7 +44,7 @@ const PLACEHOLDER_FEEDBACK: InterviewFeedback = {
 @Component({
   selector: "app-interview-session-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent],
+  imports: [CommonModule, FormsModule, SidebarComponent, AppLoaderComponent],
   templateUrl: "./interview-session-page.component.html",
   styleUrls: ["./interview-session-page.component.css"],
 })

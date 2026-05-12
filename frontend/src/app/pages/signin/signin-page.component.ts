@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, inject } from "@angular/core";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { AuthService } from "../../core/services/auth.service";
+import { AppLoaderComponent } from "../../shared/components/app-loader/app-loader.component";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ADMIN_IDENTIFIER = "admin";
@@ -9,7 +10,7 @@ const ADMIN_IDENTIFIER = "admin";
 @Component({
   selector: "app-signin-page",
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AppLoaderComponent],
   templateUrl: "./signin-page.component.html",
   styleUrls: ["./signin-page.component.css"],
 })

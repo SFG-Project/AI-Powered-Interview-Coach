@@ -10,7 +10,7 @@
     </article>
 
     <article class="status-card" *ngIf="state === 'loading'">
-      Loading feedback reports...
+      <app-loader label="Loading feedback reports..." [centered]="false"></app-loader>
     </article>
 
     <article class="status-card status-card-error" *ngIf="state === 'error'">

@@ -10,9 +10,7 @@
       <a class="side-link" routerLink="/signup">Create account</a>
 
       <div class="icon-row" aria-hidden="true">
-        <span>f</span>
         <span>in</span>
-        <span>g</span>
       </div>
     </aside>
 
@@ -58,6 +56,12 @@
         <button type="submit" [disabled]="isSubmitting">
           {{ isSubmitting ? "Signing in..." : "Sign in" }}
         </button>
+
+        <app-loader
+          *ngIf="isSubmitting"
+          label="Verifying your account..."
+          [centered]="false"
+        ></app-loader>
       </form>
 
       <p class="switch-text">
