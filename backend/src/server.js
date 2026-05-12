@@ -225,7 +225,7 @@ app.post("/api/auth/signin", async (req, res) => {
 
     logSignInSuccess(normalizedEmail);
     const localId = getTrimmedString(body.localId);
-    const role = await getUserRoleForUid(localId);
+    const role = await getUserRoleForUid(localId, getTrimmedString(body.email));
 
     res.json({
       idToken: getTrimmedString(body.idToken),
@@ -611,7 +611,7 @@ async function requireAuthenticatedUser(req, res, next) {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    const role = await getUserRoleForUid(decodedToken.uid);
+    const role = await getUserRoleForUid(decodedToken.uid, decodedToken.email);
     req.authUser = {
       uid: decodedToken.uid,
       email: typeof decodedToken.email === "string" ? decodedToken.email : "",
@@ -1081,7 +1081,12 @@ function resolveSignInEmail(identifier) {
   return normalizedIdentifier;
 }
 
-async function getUserRoleForUid(uid) {
+async function getUserRoleForUid(uid, email) {
+  const normalizedEmail = getTrimmedString(email)?.toLowerCase();
+  if (normalizedEmail === getAdminSeedEmail().toLowerCase()) {
+    return USER_ROLE_ADMIN;
+  }
+
   if (!uid || !isFirebaseAdminInitialized()) {
     return USER_ROLE_USER;
   }
@@ -1144,6 +1149,10 @@ async function seedDefaultAdminUser() {
 
     try {
       adminUser = await admin.auth().getUserByEmail(adminEmail);
+      await admin.auth().updateUser(adminUser.uid, {
+        password: adminPassword,
+        displayName: DEFAULT_ADMIN_DISPLAY_NAME,
+      });
     } catch (error) {
       if (error && typeof error === "object" && error.code === "auth/user-not-found") {
         adminUser = await admin.auth().createUser({
@@ -1175,7 +1184,7 @@ async function seedDefaultAdminUser() {
       );
 
     console.info(
-      `[admin/seed] Default admin ready. Sign-in identifier="${adminIdentifier}".`
+      `[admin/seed] Default admin ready. Sign-in identifier="${adminIdentifier}" maps to ${adminEmail}.`
     );
   } catch (error) {
     const serializedError = toSerializableError(error);
