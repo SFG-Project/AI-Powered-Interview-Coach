@@ -3,10 +3,19 @@ import { LandingPageComponent } from "./pages/landing/landing-page.component";
 import { FeedbackReportsPageComponent } from "./pages/feedback-reports/feedback-reports-page.component";
 import { InterviewSessionPageComponent } from "./pages/interview-session/interview-session-page.component";
 import { AuthGuard } from './core/auth/auth.guard';
+import { AdminGuard } from "./core/auth/admin.guard";
 
 export const routes: Routes = [
   { path: "", component: LandingPageComponent },
   { path: "dashboard", loadComponent: () => import('./pages/dashboard/dashboard-page.component').then(m => m.DashboardPageComponent), canActivate: [AuthGuard] },
+  {
+    path: "admin",
+    loadComponent: () =>
+      import("./pages/admin-dashboard/admin-dashboard-page.component").then(
+        (m) => m.AdminDashboardPageComponent
+      ),
+    canActivate: [AuthGuard, AdminGuard],
+  },
 
   { path: "interview-session", loadComponent: () => import('./pages/interview-session/interview-session-page.component').then(m => m.InterviewSessionPageComponent), canActivate: [AuthGuard] },
   { path: "progress", loadComponent: () => import('./pages/progress/progress-page.component').then(m => m.ProgressPageComponent), canActivate: [AuthGuard] },

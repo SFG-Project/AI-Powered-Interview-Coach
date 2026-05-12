@@ -3,6 +3,8 @@ import { Injectable, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 import { environment } from "../../../environments/environment";
 
+export type UserRole = "admin" | "user";
+
 export interface SignUpPayload {
   firstName: string;
   lastName: string;
@@ -21,26 +23,41 @@ interface AuthErrorDetails {
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokenKey = "authToken";
+  private readonly roleKey = "authRole";
+  private readonly userIdKey = "authUserId";
   private readonly authApiBaseUrl = this.buildAuthApiBaseUrl();
 
-  async signIn(email: string, password: string): Promise<void> {
+  async signIn(identifier: string, password: string): Promise<void> {
     const signInUrl = `${this.authApiBaseUrl}/signin`;
     this.logSignInRequestUrl(signInUrl);
 
     try {
       const response = await firstValueFrom(
-        this.http.post<{ idToken: string }>(signInUrl, { email, password }, { observe: "response" })
+        this.http.post<{ idToken: string; localId?: string; role?: UserRole }>(
+          signInUrl,
+          { email: identifier, password },
+          { observe: "response" }
+        )
       );
       this.logSignInResponseStatus(signInUrl, response.status);
 
       const idToken =
         typeof response.body?.idToken === "string" ? response.body.idToken.trim() : "";
+      const role = this.normalizeRole(response.body?.role);
+      const localId =
+        typeof response.body?.localId === "string" ? response.body.localId.trim() : "";
 
       if (!idToken) {
         throw new Error("Authentication token missing in sign-in response.");
       }
 
       sessionStorage.setItem(this.tokenKey, idToken);
+      sessionStorage.setItem(this.roleKey, role);
+      if (localId) {
+        sessionStorage.setItem(this.userIdKey, localId);
+      } else {
+        sessionStorage.removeItem(this.userIdKey);
+      }
     } catch (error) {
       this.logSignInErrorForDevelopment(signInUrl, this.getErrorDetails(error));
       throw error;
@@ -54,10 +71,20 @@ export class AuthService {
 
   logout(): void {
     sessionStorage.removeItem(this.tokenKey);
+    sessionStorage.removeItem(this.roleKey);
+    sessionStorage.removeItem(this.userIdKey);
   }
 
   isAuthenticated(): boolean {
     return !!sessionStorage.getItem(this.tokenKey);
+  }
+
+  isAdmin(): boolean {
+    return this.getRole() === "admin";
+  }
+
+  getRole(): UserRole {
+    return this.normalizeRole(sessionStorage.getItem(this.roleKey));
   }
 
   async signUp(payload: SignUpPayload): Promise<void> {
@@ -213,5 +240,9 @@ export class AuthService {
   private buildAuthApiBaseUrl(): string {
     const trimmedBaseUrl = environment.apiBaseUrl.trim().replace(/\/+$/, "");
     return trimmedBaseUrl ? `${trimmedBaseUrl}/api/auth` : "/api/auth";
+  }
+
+  private normalizeRole(value: unknown): UserRole {
+    return value === "admin" ? "admin" : "user";
   }
 }

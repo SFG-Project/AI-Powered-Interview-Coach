@@ -10,6 +10,7 @@ export interface UserProfile {
   displayName?: string;
   email?: string;
   industry?: string;
+  role?: "admin" | "user";
 }
 
 @Injectable({ providedIn: "root" })

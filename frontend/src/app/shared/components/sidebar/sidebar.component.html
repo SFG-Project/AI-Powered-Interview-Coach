@@ -1,6 +1,6 @@
 <aside class="sidebar">
   <div>
-    <div class="brand">AI Coach</div>
+    <div class="brand">{{ brandLabel }}</div>
     <a
       class="section-link"
       [class.active]="activeItem === 'interview-session'"
@@ -10,7 +10,7 @@
     </a>
 
     <nav class="nav-list" aria-label="Dashboard navigation">
-      <ng-container *ngFor="let item of navItems">
+      <ng-container *ngFor="let item of visibleNavItems">
         <a
           *ngIf="item.key !== 'sign-out'; else signOutTemplate"
           class="nav-item"
@@ -29,5 +29,5 @@
     </nav>
   </div>
 
-  <p class="sidebar-footer">Practice smarter, interview better.</p>
+  <p class="sidebar-footer">{{ footerLabel }}</p>
 </aside>

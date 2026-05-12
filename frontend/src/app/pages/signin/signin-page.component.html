@@ -28,13 +28,13 @@
       </div>
 
       <form novalidate (submit)="onSubmit($event)">
-        <label for="signin-email">Email</label>
+        <label for="signin-identifier">Email or Admin</label>
         <input
-          id="signin-email"
-          type="email"
-          [value]="email"
-          (input)="onFieldInput('email', $event)"
-          autocomplete="email"
+          id="signin-identifier"
+          type="text"
+          [value]="identifier"
+          (input)="onFieldInput('identifier', $event)"
+          autocomplete="username"
         />
 
         <label for="signin-password">Password</label>
