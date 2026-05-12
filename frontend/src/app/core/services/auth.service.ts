@@ -19,6 +19,14 @@ interface AuthErrorDetails {
   status?: number;
 }
 
+interface SignInResponsePayload {
+  idToken: string;
+  localId?: string;
+  role?: UserRole | string;
+  isAdmin?: boolean;
+  email?: string;
+}
+
 @Injectable({ providedIn: "root" })
 export class AuthService {
   private readonly http = inject(HttpClient);
@@ -33,17 +41,17 @@ export class AuthService {
 
     try {
       const response = await firstValueFrom(
-        this.http.post<{ idToken: string; localId?: string; role?: UserRole }>(
+        this.http.post<SignInResponsePayload>(
           signInUrl,
           { email: identifier, password },
           { observe: "response" }
         )
       );
       this.logSignInResponseStatus(signInUrl, response.status);
+      this.logSignInResponseRolePayloadForDevelopment(response.body);
 
       const idToken =
         typeof response.body?.idToken === "string" ? response.body.idToken.trim() : "";
-      const role = this.normalizeRole(response.body?.role);
       const localId =
         typeof response.body?.localId === "string" ? response.body.localId.trim() : "";
 
@@ -52,12 +60,15 @@ export class AuthService {
       }
 
       sessionStorage.setItem(this.tokenKey, idToken);
-      sessionStorage.setItem(this.roleKey, role);
       if (localId) {
         sessionStorage.setItem(this.userIdKey, localId);
       } else {
         sessionStorage.removeItem(this.userIdKey);
       }
+
+      const role = await this.resolveRoleAfterSignIn(response.body);
+      sessionStorage.setItem(this.roleKey, role);
+      this.logStoredAuthStateForDevelopment(role, localId);
     } catch (error) {
       this.logSignInErrorForDevelopment(signInUrl, this.getErrorDetails(error));
       throw error;
@@ -243,6 +254,95 @@ export class AuthService {
   }
 
   private normalizeRole(value: unknown): UserRole {
-    return value === "admin" ? "admin" : "user";
+    if (typeof value !== "string") {
+      return "user";
+    }
+
+    return value.trim().toLowerCase() === "admin" ? "admin" : "user";
+  }
+
+  private async resolveRoleAfterSignIn(
+    payload: SignInResponsePayload | null | undefined
+  ): Promise<UserRole> {
+    const roleFromPayload = this.resolveRoleFromPayload(payload);
+    const hasExplicitRole =
+      typeof payload?.role === "string" || typeof payload?.isAdmin === "boolean";
+
+    if (hasExplicitRole) {
+      return roleFromPayload;
+    }
+
+    const roleFromSession = await this.fetchRoleFromSession();
+    return roleFromSession || roleFromPayload;
+  }
+
+  private resolveRoleFromPayload(payload: SignInResponsePayload | null | undefined): UserRole {
+    if (payload?.isAdmin === true) {
+      return "admin";
+    }
+
+    return this.normalizeRole(payload?.role);
+  }
+
+  private async fetchRoleFromSession(): Promise<UserRole | null> {
+    try {
+      const session = await firstValueFrom(
+        this.http.get<{ role?: unknown; isAdmin?: unknown }>(`${this.authApiBaseUrl}/session`)
+      );
+
+      if (session?.isAdmin === true) {
+        if (!environment.production) {
+          console.info("[auth/session] Resolved role from session endpoint: admin");
+        }
+        return "admin";
+      }
+
+      const normalizedRole = this.normalizeRole(session?.role);
+      if (!environment.production) {
+        console.info(
+          `[auth/session] Resolved role from session endpoint: ${normalizedRole}`
+        );
+      }
+
+      return normalizedRole;
+    } catch (error) {
+      if (!environment.production) {
+        const details = this.getErrorDetails(error);
+        console.warn("[auth/session] Failed to resolve role from session endpoint.", {
+          httpStatus: details.status ?? null,
+          errorCode: details.code ?? null,
+          errorMessage: details.message ?? null,
+        });
+      }
+
+      return null;
+    }
+  }
+
+  private logSignInResponseRolePayloadForDevelopment(
+    payload: SignInResponsePayload | null | undefined
+  ): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[auth/signin] Response role payload.", {
+      role: typeof payload?.role === "string" ? payload.role : null,
+      isAdmin: typeof payload?.isAdmin === "boolean" ? payload.isAdmin : null,
+      localIdFound:
+        typeof payload?.localId === "string" && Boolean(payload.localId.trim()),
+    });
+  }
+
+  private logStoredAuthStateForDevelopment(role: UserRole, localId: string): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[auth/signin] Stored auth state.", {
+      role,
+      localIdFound: Boolean(localId),
+      tokenFound: Boolean(this.getToken()),
+    });
   }
 }

@@ -1,7 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { Component, Input } from "@angular/core";
+import { Component, Input, OnInit } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { AuthService } from '../../../core/services/auth.service';
+import { environment } from "../../../../environments/environment";
 
 type SidebarItemKey =
   | "admin-dashboard"
@@ -26,7 +27,7 @@ interface SidebarNavItem {
   templateUrl: "./sidebar.component.html",
   styleUrls: ["./sidebar.component.css"],
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit {
   @Input() activeItem: SidebarItemKey = "dashboard";
   @Input() brandLabel = "AI Coach";
   @Input() footerLabel = "Practice smarter, interview better.";
@@ -47,6 +48,17 @@ export class SidebarComponent {
     { key: "settings", label: "Settings", route: "/settings" },
     { key: "sign-out", label: "Sign Out" },
   ];
+
+  ngOnInit(): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[sidebar] Role check.", {
+      role: this.authService.getRole(),
+      isAdmin: this.authService.isAdmin(),
+    });
+  }
 
   get visibleNavItems(): SidebarNavItem[] {
     return this.navItems.filter((item) => !item.adminOnly || this.authService.isAdmin());

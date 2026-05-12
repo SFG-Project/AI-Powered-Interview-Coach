@@ -226,6 +226,8 @@ app.post("/api/auth/signin", async (req, res) => {
     logSignInSuccess(normalizedEmail);
     const localId = getTrimmedString(body.localId);
     const role = await getUserRoleForUid(localId, getTrimmedString(body.email));
+    const isAdmin = role === USER_ROLE_ADMIN;
+    logSignInRoleResolution(normalizedEmail, role, localId);
 
     res.json({
       idToken: getTrimmedString(body.idToken),
@@ -234,6 +236,7 @@ app.post("/api/auth/signin", async (req, res) => {
       localId,
       email: getTrimmedString(body.email),
       role,
+      isAdmin,
     });
   } catch (error) {
     const serializedError = toSerializableError(error);
@@ -249,6 +252,18 @@ app.post("/api/auth/signin", async (req, res) => {
       message: "Sign in failed due to an upstream authentication request error.",
     });
   }
+});
+
+app.get("/api/auth/session", requireAuthenticatedUser, (req, res) => {
+  const role = normalizeUserRole(req.authUser?.role);
+
+  res.status(200).json({
+    uid: getTrimmedString(req.authUser?.uid),
+    email: getTrimmedString(req.authUser?.email),
+    displayName: getTrimmedString(req.authUser?.displayName),
+    role,
+    isAdmin: role === USER_ROLE_ADMIN,
+  });
 });
 
 app.get("/api/settings/me", requireAuthenticatedUser, async (req, res) => {
@@ -1184,7 +1199,7 @@ async function seedDefaultAdminUser() {
       );
 
     console.info(
-      `[admin/seed] Default admin ready. Sign-in identifier="${adminIdentifier}" maps to ${adminEmail}.`
+      `[admin/seed] Default admin ready. role=${USER_ROLE_ADMIN}. Sign-in identifier="${adminIdentifier}" maps to ${adminEmail}.`
     );
   } catch (error) {
     const serializedError = toSerializableError(error);
@@ -1299,7 +1314,7 @@ function logSignInFailure({ email, normalizedErrorCode, providerErrorCode, detai
 
 function logAuthRouteRegistration() {
   console.info(
-    "[startup] Registered auth routes: POST /api/auth/signup, POST /api/auth/signin. Admin route: GET /api/admin/dashboard."
+    "[startup] Registered auth routes: POST /api/auth/signup, POST /api/auth/signin, GET /api/auth/session. Admin route: GET /api/admin/dashboard."
   );
 }
 
@@ -1329,6 +1344,19 @@ function logSignInRouteHit(req) {
 function logSignInSuccess(email) {
   const maskedEmail = maskEmail(email);
   console.info(`[auth/signin] Success for ${maskedEmail}.`);
+}
+
+function logSignInRoleResolution(email, role, uid) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const maskedEmail = maskEmail(email);
+  const normalizedRole = normalizeUserRole(role);
+  const hasUid = typeof uid === "string" && Boolean(uid.trim());
+  console.info(
+    `[auth/signin] Role resolved for ${maskedEmail}. role=${normalizedRole}. uidFound=${hasUid}.`
+  );
 }
 
 function logProgressRouteHit(uid) {
