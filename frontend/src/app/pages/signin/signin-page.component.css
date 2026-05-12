@@ -19,7 +19,14 @@
 
 .auth-side {
   padding: clamp(24px, 5vw, 42px);
-  background: #eaf2ff;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)),
+    url("/assets/login_right.jpeg");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
 }
 
 .eyebrow {
@@ -27,18 +34,18 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.75rem;
-  color: #1e3a8a;
+  color: #bfdbfe;
 }
 
 .auth-side h1 {
   margin: 10px 0 8px;
   font-size: clamp(1.7rem, 3vw, 2.2rem);
-  color: #0f172a;
+  color: #ffffff;
 }
 
 .auth-side p {
   margin: 0;
-  color: #334155;
+  color: #f0f2f5;
   line-height: 1.55;
 }
 
@@ -70,6 +77,19 @@
 
 .auth-form-panel {
   padding: clamp(24px, 5vw, 42px);
+
+  background-image:
+    linear-gradient(
+      rgba(255, 255, 255, 0.45),
+      rgba(255, 255, 255, 0.45)
+    ),
+    url("/assets/login_left.jpeg");
+
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+
+  position: relative;
 }
 
 .auth-form-panel h2 {
@@ -80,6 +100,22 @@
 .form-note {
   margin: 8px 0 16px;
   color: #475569;
+}
+.auth-side {
+  padding: clamp(24px, 5vw, 42px);
+
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
+    url("/assets/login_right.jpeg");
+
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+
+  display: flex;
+  flex-direction: column;
+
+  color: white;
 }
 
 .success-message {

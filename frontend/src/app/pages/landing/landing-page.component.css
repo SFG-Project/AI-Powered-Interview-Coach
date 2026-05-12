@@ -35,16 +35,11 @@
   justify-content: center;
 }
 
-.media-figure {
+.hero-img {
   width: min(420px, 100%);
-  aspect-ratio: 4 / 5;
-  border-radius: 22px;
-  border: 1px dashed #cbd5e1;
-  background: linear-gradient(145deg, #f1f5f9 0%, #ffffff 75%);
-  display: grid;
-  place-items: center;
-  color: #64748b;
-  font-weight: 600;
+  max-height: 500px;
+  object-fit: contain;
+  display: block;
 }
 
 .hero-content h2 {
