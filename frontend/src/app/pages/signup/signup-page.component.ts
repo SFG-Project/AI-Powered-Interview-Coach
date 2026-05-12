@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, inject } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { AuthService } from "../../core/services/auth.service";
+import { AppLoaderComponent } from "../../shared/components/app-loader/app-loader.component";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,7 +17,7 @@ type SignUpField =
 @Component({
   selector: "app-signup-page",
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AppLoaderComponent],
   templateUrl: "./signup-page.component.html",
   styleUrls: ["./signup-page.component.css"],
 })

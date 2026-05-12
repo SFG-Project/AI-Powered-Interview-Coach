@@ -9,7 +9,9 @@
       <p>Track your growth across different interview skills.</p>
     </article>
 
-    <article class="status-card" *ngIf="state === 'loading'">Loading progress...</article>
+    <article class="status-card" *ngIf="state === 'loading'">
+      <app-loader label="Loading progress..." [centered]="false"></app-loader>
+    </article>
 
     <article class="status-card status-card-error" *ngIf="state === 'error'">
       Could not load progress right now.

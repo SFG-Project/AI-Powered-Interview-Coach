@@ -2,13 +2,15 @@ import { CommonModule } from "@angular/common";
 import { Component, inject } from "@angular/core";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { AuthService } from "../../core/services/auth.service";
+import { AppLoaderComponent } from "../../shared/components/app-loader/app-loader.component";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ADMIN_IDENTIFIER = "admin";
 
 @Component({
   selector: "app-signin-page",
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, AppLoaderComponent],
   templateUrl: "./signin-page.component.html",
   styleUrls: ["./signin-page.component.css"],
 })
@@ -17,7 +19,7 @@ export class SignInPageComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  email = "";
+  identifier = "";
   password = "";
   acceptedTerms = false;
 
@@ -33,7 +35,7 @@ export class SignInPageComponent {
     }
   }
 
-  onFieldInput(field: "email" | "password", event: Event): void {
+  onFieldInput(field: "identifier" | "password", event: Event): void {
     const input = event.target as HTMLInputElement | null;
     if (!input) {
       return;
@@ -63,8 +65,8 @@ export class SignInPageComponent {
     this.isSubmitting = true;
 
     try {
-      await this.authService.signIn(this.email.trim().toLowerCase(), this.password);
-      await this.router.navigateByUrl("/dashboard");
+      await this.authService.signIn(this.identifier.trim().toLowerCase(), this.password);
+      await this.router.navigateByUrl(this.authService.isAdmin() ? "/admin" : "/dashboard");
     } catch (error) {
       this.authError = this.authService.getSignInErrorMessage(error);
     } finally {
@@ -74,12 +76,15 @@ export class SignInPageComponent {
 
   private validateForm(): string[] {
     const errors: string[] = [];
-    const trimmedEmail = this.email.trim();
+    const trimmedIdentifier = this.identifier.trim();
 
-    if (!trimmedEmail) {
-      errors.push("Email is required.");
-    } else if (!EMAIL_PATTERN.test(trimmedEmail)) {
-      errors.push("Please provide a valid email address.");
+    if (!trimmedIdentifier) {
+      errors.push("Email or Admin is required.");
+    } else if (
+      !EMAIL_PATTERN.test(trimmedIdentifier) &&
+      trimmedIdentifier.toLowerCase() !== ADMIN_IDENTIFIER
+    ) {
+      errors.push("Please provide a valid email address or use Admin.");
     }
 
     if (!this.password) {

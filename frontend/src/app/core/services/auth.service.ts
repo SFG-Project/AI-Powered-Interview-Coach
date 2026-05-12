@@ -3,6 +3,8 @@ import { Injectable, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 import { environment } from "../../../environments/environment";
 
+export type UserRole = "admin" | "user";
+
 export interface SignUpPayload {
   firstName: string;
   lastName: string;
@@ -17,29 +19,56 @@ interface AuthErrorDetails {
   status?: number;
 }
 
+interface SignInResponsePayload {
+  idToken: string;
+  localId?: string;
+  role?: UserRole | string;
+  isAdmin?: boolean;
+  email?: string;
+}
+
 @Injectable({ providedIn: "root" })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokenKey = "authToken";
+  private readonly roleKey = "authRole";
+  private readonly userIdKey = "authUserId";
+  private readonly authApiBaseUrl = this.buildAuthApiBaseUrl();
 
-  async signIn(email: string, password: string): Promise<void> {
-    const signInUrl = `${environment.apiBaseUrl}/api/auth/signin`;
+  async signIn(identifier: string, password: string): Promise<void> {
+    const signInUrl = `${this.authApiBaseUrl}/signin`;
     this.logSignInRequestUrl(signInUrl);
 
     try {
       const response = await firstValueFrom(
-        this.http.post<{ idToken: string }>(signInUrl, { email, password }, { observe: "response" })
+        this.http.post<SignInResponsePayload>(
+          signInUrl,
+          { email: identifier, password },
+          { observe: "response" }
+        )
       );
       this.logSignInResponseStatus(signInUrl, response.status);
+      this.logSignInResponseRolePayloadForDevelopment(response.body);
 
       const idToken =
         typeof response.body?.idToken === "string" ? response.body.idToken.trim() : "";
+      const localId =
+        typeof response.body?.localId === "string" ? response.body.localId.trim() : "";
 
       if (!idToken) {
         throw new Error("Authentication token missing in sign-in response.");
       }
 
       sessionStorage.setItem(this.tokenKey, idToken);
+      if (localId) {
+        sessionStorage.setItem(this.userIdKey, localId);
+      } else {
+        sessionStorage.removeItem(this.userIdKey);
+      }
+
+      const role = await this.resolveRoleAfterSignIn(response.body);
+      sessionStorage.setItem(this.roleKey, role);
+      this.logStoredAuthStateForDevelopment(role, localId);
     } catch (error) {
       this.logSignInErrorForDevelopment(signInUrl, this.getErrorDetails(error));
       throw error;
@@ -53,16 +82,24 @@ export class AuthService {
 
   logout(): void {
     sessionStorage.removeItem(this.tokenKey);
+    sessionStorage.removeItem(this.roleKey);
+    sessionStorage.removeItem(this.userIdKey);
   }
 
   isAuthenticated(): boolean {
     return !!sessionStorage.getItem(this.tokenKey);
   }
 
+  isAdmin(): boolean {
+    return this.getRole() === "admin";
+  }
+
+  getRole(): UserRole {
+    return this.normalizeRole(sessionStorage.getItem(this.roleKey));
+  }
+
   async signUp(payload: SignUpPayload): Promise<void> {
-    await firstValueFrom(
-      this.http.post<{ id: string }>(`${environment.apiBaseUrl}/api/auth/signup`, payload)
-    );
+    await firstValueFrom(this.http.post<{ id: string }>(`${this.authApiBaseUrl}/signup`, payload));
   }
 
   getSignInErrorMessage(error: unknown): string {
@@ -208,6 +245,104 @@ export class AuthService {
       httpStatus: details.status ?? null,
       errorCode: details.code ?? null,
       errorMessage: details.message ?? null,
+    });
+  }
+
+  private buildAuthApiBaseUrl(): string {
+    const trimmedBaseUrl = environment.apiBaseUrl.trim().replace(/\/+$/, "");
+    return trimmedBaseUrl ? `${trimmedBaseUrl}/api/auth` : "/api/auth";
+  }
+
+  private normalizeRole(value: unknown): UserRole {
+    if (typeof value !== "string") {
+      return "user";
+    }
+
+    return value.trim().toLowerCase() === "admin" ? "admin" : "user";
+  }
+
+  private async resolveRoleAfterSignIn(
+    payload: SignInResponsePayload | null | undefined
+  ): Promise<UserRole> {
+    const roleFromPayload = this.resolveRoleFromPayload(payload);
+    const hasExplicitRole =
+      typeof payload?.role === "string" || typeof payload?.isAdmin === "boolean";
+
+    if (hasExplicitRole) {
+      return roleFromPayload;
+    }
+
+    const roleFromSession = await this.fetchRoleFromSession();
+    return roleFromSession || roleFromPayload;
+  }
+
+  private resolveRoleFromPayload(payload: SignInResponsePayload | null | undefined): UserRole {
+    if (payload?.isAdmin === true) {
+      return "admin";
+    }
+
+    return this.normalizeRole(payload?.role);
+  }
+
+  private async fetchRoleFromSession(): Promise<UserRole | null> {
+    try {
+      const session = await firstValueFrom(
+        this.http.get<{ role?: unknown; isAdmin?: unknown }>(`${this.authApiBaseUrl}/session`)
+      );
+
+      if (session?.isAdmin === true) {
+        if (!environment.production) {
+          console.info("[auth/session] Resolved role from session endpoint: admin");
+        }
+        return "admin";
+      }
+
+      const normalizedRole = this.normalizeRole(session?.role);
+      if (!environment.production) {
+        console.info(
+          `[auth/session] Resolved role from session endpoint: ${normalizedRole}`
+        );
+      }
+
+      return normalizedRole;
+    } catch (error) {
+      if (!environment.production) {
+        const details = this.getErrorDetails(error);
+        console.warn("[auth/session] Failed to resolve role from session endpoint.", {
+          httpStatus: details.status ?? null,
+          errorCode: details.code ?? null,
+          errorMessage: details.message ?? null,
+        });
+      }
+
+      return null;
+    }
+  }
+
+  private logSignInResponseRolePayloadForDevelopment(
+    payload: SignInResponsePayload | null | undefined
+  ): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[auth/signin] Response role payload.", {
+      role: typeof payload?.role === "string" ? payload.role : null,
+      isAdmin: typeof payload?.isAdmin === "boolean" ? payload.isAdmin : null,
+      localIdFound:
+        typeof payload?.localId === "string" && Boolean(payload.localId.trim()),
+    });
+  }
+
+  private logStoredAuthStateForDevelopment(role: UserRole, localId: string): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[auth/signin] Stored auth state.", {
+      role,
+      localIdFound: Boolean(localId),
+      tokenFound: Boolean(this.getToken()),
     });
   }
 }

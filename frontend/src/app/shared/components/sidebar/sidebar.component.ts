@@ -1,9 +1,11 @@
 import { CommonModule } from "@angular/common";
-import { Component, Input } from "@angular/core";
+import { Component, Input, OnInit } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { AuthService } from '../../../core/services/auth.service';
+import { environment } from "../../../../environments/environment";
 
 type SidebarItemKey =
+  | "admin-dashboard"
   | "interview-session"
   | "dashboard"
   | "progress"
@@ -15,6 +17,7 @@ interface SidebarNavItem {
   key: SidebarItemKey;
   label: string;
   route?: string;
+  adminOnly?: boolean;
 }
 
 @Component({
@@ -24,14 +27,17 @@ interface SidebarNavItem {
   templateUrl: "./sidebar.component.html",
   styleUrls: ["./sidebar.component.css"],
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit {
   @Input() activeItem: SidebarItemKey = "dashboard";
+  @Input() brandLabel = "AI Coach";
+  @Input() footerLabel = "Practice smarter, interview better.";
 
   constructor(private authService: AuthService, private router: Router) {}
 
   readonly interviewSessionRoute = "/interview-session";
 
   readonly navItems: SidebarNavItem[] = [
+    { key: "admin-dashboard", label: "Admin Dashboard", route: "/admin", adminOnly: true },
     { key: "dashboard", label: "Dashboard", route: "/dashboard" },
     { key: "progress", label: "Progress", route: "/progress" },
     {
@@ -42,6 +48,21 @@ export class SidebarComponent {
     { key: "settings", label: "Settings", route: "/settings" },
     { key: "sign-out", label: "Sign Out" },
   ];
+
+  ngOnInit(): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[sidebar] Role check.", {
+      role: this.authService.getRole(),
+      isAdmin: this.authService.isAdmin(),
+    });
+  }
+
+  get visibleNavItems(): SidebarNavItem[] {
+    return this.navItems.filter((item) => !item.adminOnly || this.authService.isAdmin());
+  }
 
   onNavItemClick(item: SidebarNavItem): void {
     if (item.key === "sign-out") {

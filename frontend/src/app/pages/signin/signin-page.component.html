@@ -10,9 +10,7 @@
       <a class="side-link" routerLink="/signup">Create account</a>
 
       <div class="icon-row" aria-hidden="true">
-        <span>f</span>
         <span>in</span>
-        <span>g</span>
       </div>
     </aside>
 
@@ -28,13 +26,13 @@
       </div>
 
       <form novalidate (submit)="onSubmit($event)">
-        <label for="signin-email">Email</label>
+        <label for="signin-identifier">Email or Admin</label>
         <input
-          id="signin-email"
-          type="email"
-          [value]="email"
-          (input)="onFieldInput('email', $event)"
-          autocomplete="email"
+          id="signin-identifier"
+          type="text"
+          [value]="identifier"
+          (input)="onFieldInput('identifier', $event)"
+          autocomplete="username"
         />
 
         <label for="signin-password">Password</label>
@@ -58,6 +56,12 @@
         <button type="submit" [disabled]="isSubmitting">
           {{ isSubmitting ? "Signing in..." : "Sign in" }}
         </button>
+
+        <app-loader
+          *ngIf="isSubmitting"
+          label="Verifying your account..."
+          [centered]="false"
+        ></app-loader>
       </form>
 
       <p class="switch-text">

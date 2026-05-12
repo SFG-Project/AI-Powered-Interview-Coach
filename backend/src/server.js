@@ -30,6 +30,12 @@ const ALLOWED_CAREER_FIELDS = [
 const ALLOWED_EXPERIENCE_LEVELS = ["Beginner", "Intermediate", "Advanced"];
 const ALLOWED_INTERVIEW_TYPES = ["Technical", "Behavioural", "HR", "Mixed"];
 const ALLOWED_DIFFICULTIES = ["Easy", "Medium", "Hard"];
+const USER_ROLE_ADMIN = "admin";
+const USER_ROLE_USER = "user";
+const DEFAULT_ADMIN_IDENTIFIER = "admin";
+const DEFAULT_ADMIN_EMAIL = "admin@sfg.com";
+const DEFAULT_ADMIN_PASSWORD = "Password123!";
+const DEFAULT_ADMIN_DISPLAY_NAME = "Admin";
 
 app.use(
   cors(
@@ -45,6 +51,7 @@ app.use(
 app.use(express.json());
 
 initializeFirebaseAdmin();
+void seedDefaultAdminUser();
 logMissingCriticalEnvironmentVariables();
 app.use("/api/interview", interviewRoutes);
 app.use("/api/dashboard", createDashboardRoutes({ requireAuthenticatedUser }));
@@ -54,6 +61,8 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.post("/api/auth/signup", async (req, res) => {
+  logSignUpRouteHit(req);
+
   const payload = req.body;
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     res.status(400).json({ message: "Signup payload must be a JSON object." });
@@ -106,16 +115,20 @@ app.post("/api/auth/signup", async (req, res) => {
       .doc(createdUser.uid)
       .set(
         {
+          uid: createdUser.uid,
           firstName,
           lastName,
           displayName,
           email,
           industry,
+          role: USER_ROLE_USER,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
       );
 
+    logSignUpSuccess(email, createdUser.uid);
     res.status(201).json({ id: createdUser.uid });
   } catch (error) {
     if (createdUser?.uid) {
@@ -127,6 +140,7 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 
     const normalizedError = normalizeAuthError(error);
+    logSignUpFailure(email, normalizedError.code);
     res.status(normalizedError.httpStatus).json({
       errorCode: normalizedError.code,
       message: normalizedError.message,
@@ -143,15 +157,19 @@ app.post("/api/auth/signin", async (req, res) => {
     return;
   }
 
-  const email = getTrimmedString(payload.email);
+  const identifier =
+    getTrimmedString(payload.email) ||
+    getTrimmedString(payload.identifier) ||
+    getTrimmedString(payload.username);
   const password = getTrimmedString(payload.password);
-  const normalizedEmail = email ? email.toLowerCase() : undefined;
+  const normalizedIdentifier = identifier ? identifier.toLowerCase() : undefined;
+  const normalizedEmail = resolveSignInEmail(normalizedIdentifier);
   const firebaseWebApiKey = getFirebaseWebApiKey();
 
   if (!normalizedEmail || !password) {
     res.status(400).json({
       errorCode: "invalid-argument",
-      message: "Email and password are required.",
+      message: "Email or Admin identifier and password are required.",
     });
     return;
   }
@@ -205,12 +223,20 @@ app.post("/api/auth/signin", async (req, res) => {
       return;
     }
 
+    logSignInSuccess(normalizedEmail);
+    const localId = getTrimmedString(body.localId);
+    const role = await getUserRoleForUid(localId, getTrimmedString(body.email));
+    const isAdmin = role === USER_ROLE_ADMIN;
+    logSignInRoleResolution(normalizedEmail, role, localId);
+
     res.json({
       idToken: getTrimmedString(body.idToken),
       refreshToken: getTrimmedString(body.refreshToken),
       expiresIn: getTrimmedString(body.expiresIn),
-      localId: getTrimmedString(body.localId),
+      localId,
       email: getTrimmedString(body.email),
+      role,
+      isAdmin,
     });
   } catch (error) {
     const serializedError = toSerializableError(error);
@@ -226,6 +252,18 @@ app.post("/api/auth/signin", async (req, res) => {
       message: "Sign in failed due to an upstream authentication request error.",
     });
   }
+});
+
+app.get("/api/auth/session", requireAuthenticatedUser, (req, res) => {
+  const role = normalizeUserRole(req.authUser?.role);
+
+  res.status(200).json({
+    uid: getTrimmedString(req.authUser?.uid),
+    email: getTrimmedString(req.authUser?.email),
+    displayName: getTrimmedString(req.authUser?.displayName),
+    role,
+    isAdmin: role === USER_ROLE_ADMIN,
+  });
 });
 
 app.get("/api/settings/me", requireAuthenticatedUser, async (req, res) => {
@@ -440,6 +478,10 @@ app.get("/api/feedback-reports/me", requireAuthenticatedUser, async (req, res) =
   }
 });
 
+app.get("/api/admin/dashboard", requireAuthenticatedUser, requireAdminUser, (_req, res) => {
+  res.status(200).json(buildAdminDashboardPayload());
+});
+
 app.get("/api/firestore/health", async (_req, res) => {
   const firestore = getFirestoreOrRespond(res);
   if (!firestore) {
@@ -491,6 +533,7 @@ app.get("/api/users/:userId", async (req, res) => {
       id: userDoc.id,
       displayName: typeof data.displayName === "string" ? data.displayName : undefined,
       email: typeof data.email === "string" ? data.email : undefined,
+      role: normalizeUserRole(data.role),
     });
   } catch (error) {
     const normalizedError = toSerializableError(error);
@@ -560,7 +603,9 @@ app.put("/api/users/:userId", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+logAuthRouteRegistration();
+
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Backend server listening on http://localhost:${PORT}`);
 });
 
@@ -581,10 +626,12 @@ async function requireAuthenticatedUser(req, res, next) {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
+    const role = await getUserRoleForUid(decodedToken.uid, decodedToken.email);
     req.authUser = {
       uid: decodedToken.uid,
       email: typeof decodedToken.email === "string" ? decodedToken.email : "",
       displayName: typeof decodedToken.name === "string" ? decodedToken.name : "",
+      role,
     };
     next();
   } catch (error) {
@@ -597,6 +644,20 @@ async function requireAuthenticatedUser(req, res, next) {
 
     res.status(401).json({ message: "Invalid or expired authentication token." });
   }
+}
+
+function requireAdminUser(req, res, next) {
+  const role = normalizeUserRole(req.authUser?.role);
+
+  if (role !== USER_ROLE_ADMIN) {
+    res.status(403).json({
+      message: "Admin access is required for this resource.",
+      errorCode: "admin-access-required",
+    });
+    return;
+  }
+
+  next();
 }
 
 function readBearerToken(authorizationHeader) {
@@ -634,6 +695,7 @@ async function ensureUserSettingsDocument(firestore, authUser) {
 
     await docRef.set({
       uid: authUser.uid,
+      role: normalizeUserRole(authUser.role),
       email: defaults.email,
       fullName: defaults.fullName,
       careerField: defaults.careerField,
@@ -655,6 +717,11 @@ async function ensureUserSettingsDocument(firestore, authUser) {
 
   if (typeof data.uid !== "string" || data.uid.trim() !== authUser.uid) {
     patch.uid = authUser.uid;
+  }
+
+  const normalizedRole = normalizeUserRole(data.role);
+  if (data.role !== normalizedRole) {
+    patch.role = normalizedRole;
   }
 
   if (typeof data.email !== "string" || !data.email.trim()) {
@@ -756,6 +823,7 @@ function buildSettingsResponse(snapshot) {
 
   return {
     uid: snapshot.id,
+    role: normalizeUserRole(data.role),
     email: typeof data.email === "string" ? data.email : "",
     fullName: typeof data.fullName === "string" ? data.fullName : "",
     careerField: ALLOWED_CAREER_FIELDS.includes(data.careerField)
@@ -1011,6 +1079,227 @@ function getFirebaseWebApiKey() {
   return getTrimmedString(process.env.FIREBASE_WEB_API_KEY);
 }
 
+function resolveSignInEmail(identifier) {
+  const normalizedIdentifier = getTrimmedString(identifier)?.toLowerCase();
+  if (!normalizedIdentifier) {
+    return undefined;
+  }
+
+  if (normalizedIdentifier === getAdminSeedIdentifier()) {
+    return getAdminSeedEmail().toLowerCase();
+  }
+
+  if (!EMAIL_PATTERN.test(normalizedIdentifier)) {
+    return undefined;
+  }
+
+  return normalizedIdentifier;
+}
+
+async function getUserRoleForUid(uid, email) {
+  const normalizedEmail = getTrimmedString(email)?.toLowerCase();
+  if (normalizedEmail === getAdminSeedEmail().toLowerCase()) {
+    return USER_ROLE_ADMIN;
+  }
+
+  if (!uid || !isFirebaseAdminInitialized()) {
+    return USER_ROLE_USER;
+  }
+
+  try {
+    const userDocRef = admin.firestore().collection(USERS_COLLECTION).doc(uid);
+    const userSnapshot = await userDocRef.get();
+
+    if (!userSnapshot.exists) {
+      return USER_ROLE_USER;
+    }
+
+    const data = userSnapshot.data() || {};
+    const normalizedRole = normalizeUserRole(data.role);
+
+    if (data.role !== normalizedRole) {
+      await userDocRef.set(
+        {
+          role: normalizedRole,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    return normalizedRole;
+  } catch (error) {
+    const serializedError = toSerializableError(error);
+    console.warn(
+      `[auth/role] Failed to resolve role for uid=${uid}. errorCode=${
+        serializedError.code || "unknown"
+      }.`
+    );
+    return USER_ROLE_USER;
+  }
+}
+
+function normalizeUserRole(value) {
+  const normalized = getTrimmedString(value)?.toLowerCase();
+  return normalized === USER_ROLE_ADMIN ? USER_ROLE_ADMIN : USER_ROLE_USER;
+}
+
+async function seedDefaultAdminUser() {
+  if (!isFirebaseAdminInitialized()) {
+    return;
+  }
+
+  const adminEmail = getAdminSeedEmail();
+  const adminPassword = getAdminSeedPassword();
+  const adminIdentifier = getAdminSeedIdentifier();
+
+  if (!adminEmail || !adminPassword) {
+    console.warn("[admin/seed] Missing admin seed credentials. Skipping admin seeding.");
+    return;
+  }
+
+  try {
+    const firestore = admin.firestore();
+    let adminUser;
+
+    try {
+      adminUser = await admin.auth().getUserByEmail(adminEmail);
+      await admin.auth().updateUser(adminUser.uid, {
+        password: adminPassword,
+        displayName: DEFAULT_ADMIN_DISPLAY_NAME,
+      });
+    } catch (error) {
+      if (error && typeof error === "object" && error.code === "auth/user-not-found") {
+        adminUser = await admin.auth().createUser({
+          email: adminEmail,
+          password: adminPassword,
+          displayName: DEFAULT_ADMIN_DISPLAY_NAME,
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    await firestore
+      .collection(USERS_COLLECTION)
+      .doc(adminUser.uid)
+      .set(
+        {
+          uid: adminUser.uid,
+          firstName: DEFAULT_ADMIN_DISPLAY_NAME,
+          lastName: "",
+          fullName: DEFAULT_ADMIN_DISPLAY_NAME,
+          displayName: DEFAULT_ADMIN_DISPLAY_NAME,
+          email: adminEmail,
+          industry: "Software Developer",
+          role: USER_ROLE_ADMIN,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+    console.info(
+      `[admin/seed] Default admin ready. role=${USER_ROLE_ADMIN}. Sign-in identifier="${adminIdentifier}" maps to ${adminEmail}.`
+    );
+  } catch (error) {
+    const serializedError = toSerializableError(error);
+    console.warn(
+      `[admin/seed] Failed to seed default admin. errorCode=${
+        serializedError.code || "unknown"
+      } message="${serializedError.message}".`
+    );
+  }
+}
+
+function getAdminSeedIdentifier() {
+  const identifier = getTrimmedString(process.env.ADMIN_SEED_IDENTIFIER)?.toLowerCase();
+  return identifier || DEFAULT_ADMIN_IDENTIFIER;
+}
+
+function getAdminSeedEmail() {
+  return getTrimmedString(process.env.ADMIN_SEED_EMAIL) || DEFAULT_ADMIN_EMAIL;
+}
+
+function getAdminSeedPassword() {
+  return getTrimmedString(process.env.ADMIN_SEED_PASSWORD) || DEFAULT_ADMIN_PASSWORD;
+}
+
+function buildAdminDashboardPayload() {
+  return {
+    summaryCards: [
+      { label: "Total Users", value: "148" },
+      { label: "Total Interviews", value: "520" },
+      { label: "Average Score", value: "7.4 / 10" },
+      { label: "Active Today", value: "36" },
+    ],
+    recentUsers: [
+      {
+        name: "Rorisang Sekoamane",
+        email: "rorisang@example.com",
+        role: "Software Developer",
+        status: "Active",
+        action: "View",
+      },
+      {
+        name: "Thabo Mokoena",
+        email: "thabo@example.com",
+        role: "IT Support",
+        status: "Pending",
+        action: "View",
+      },
+      {
+        name: "Lerato Nkosi",
+        email: "lerato@example.com",
+        role: "Data Analyst",
+        status: "Blocked",
+        action: "View",
+      },
+    ],
+    systemSummary: [
+      { label: "Active Users", value: "112", tone: "active" },
+      { label: "Pending Users", value: "24", tone: "pending" },
+      { label: "Blocked Users", value: "12", tone: "blocked" },
+    ],
+    performanceOverview: [
+      { label: "Technical Interviews", percentage: 82 },
+      { label: "Behavioral Interviews", percentage: 68 },
+      { label: "Mixed Interviews", percentage: 74 },
+    ],
+    recentInterviewReports: [
+      {
+        date: "06 May 2026",
+        user: "Rorisang",
+        interviewType: "Technical",
+        score: "8/10",
+        report: "Open",
+      },
+      {
+        date: "05 May 2026",
+        user: "Thabo",
+        interviewType: "Behavioral",
+        score: "7/10",
+        report: "Open",
+      },
+      {
+        date: "04 May 2026",
+        user: "Lerato",
+        interviewType: "Mixed",
+        score: "6/10",
+        report: "Open",
+      },
+    ],
+    adminActions: [
+      { label: "Add User", action: "add-user", tone: "primary" },
+      { label: "Export Reports", action: "export-reports", tone: "warning" },
+      { label: "Clear Logs", action: "clear-logs", tone: "danger" },
+    ],
+    adminUser: {
+      name: "Admin",
+      avatarText: "A",
+    },
+  };
+}
+
 function logSignInFailure({ email, normalizedErrorCode, providerErrorCode, details }) {
   const detailText = details ? ` details="${details}"` : "";
   const providerCodeText = providerErrorCode
@@ -1023,13 +1312,51 @@ function logSignInFailure({ email, normalizedErrorCode, providerErrorCode, detai
   );
 }
 
+function logAuthRouteRegistration() {
+  console.info(
+    "[startup] Registered auth routes: POST /api/auth/signup, POST /api/auth/signin, GET /api/auth/session. Admin route: GET /api/admin/dashboard."
+  );
+}
+
+function logSignUpRouteHit(req) {
+  const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
+  console.info(`[auth/signup] ${req.method} ${req.path} hit from ${origin}`);
+}
+
+function logSignUpSuccess(email, uid) {
+  const maskedEmail = maskEmail(email);
+  const hasUid = typeof uid === "string" && Boolean(uid.trim());
+  console.info(`[auth/signup] Success for ${maskedEmail}. uidCreated=${hasUid}.`);
+}
+
+function logSignUpFailure(email, normalizedErrorCode) {
+  const maskedEmail = maskEmail(email);
+  console.warn(
+    `[auth/signup] Failed for ${maskedEmail}. normalizedErrorCode=${normalizedErrorCode || "unknown"}.`
+  );
+}
+
 function logSignInRouteHit(req) {
+  const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
+  console.info(`[auth/signin] ${req.method} ${req.path} hit from ${origin}`);
+}
+
+function logSignInSuccess(email) {
+  const maskedEmail = maskEmail(email);
+  console.info(`[auth/signin] Success for ${maskedEmail}.`);
+}
+
+function logSignInRoleResolution(email, role, uid) {
   if (!isDevelopmentEnvironment()) {
     return;
   }
 
-  const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
-  console.info(`[auth/signin] ${req.method} ${req.path} hit from ${origin}`);
+  const maskedEmail = maskEmail(email);
+  const normalizedRole = normalizeUserRole(role);
+  const hasUid = typeof uid === "string" && Boolean(uid.trim());
+  console.info(
+    `[auth/signin] Role resolved for ${maskedEmail}. role=${normalizedRole}. uidFound=${hasUid}.`
+  );
 }
 
 function logProgressRouteHit(uid) {

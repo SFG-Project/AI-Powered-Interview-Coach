@@ -95,6 +95,12 @@
         <button type="submit" [disabled]="isSubmitting">
           {{ isSubmitting ? "Creating account..." : "Sign up" }}
         </button>
+
+        <app-loader
+          *ngIf="isSubmitting"
+          label="Creating your account..."
+          [centered]="false"
+        ></app-loader>
       </form>
 
       <p class="switch-text">

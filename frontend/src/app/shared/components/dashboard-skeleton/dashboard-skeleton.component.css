@@ -1,0 +1,98 @@
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-card,
+.welcome-card,
+.table-card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 18px 16px;
+}
+
+.welcome-card,
+.table-card {
+  margin-top: 12px;
+}
+
+.action-row,
+.table-head,
+.table-row {
+  display: grid;
+  gap: 10px;
+}
+
+.action-row {
+  margin-top: 16px;
+  grid-template-columns: repeat(3, minmax(0, 130px));
+}
+
+.table-head,
+.table-row {
+  margin-top: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e5eaf3;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+.skeleton-line {
+  height: 14px;
+}
+
+.skeleton-line.short {
+  width: 42%;
+}
+
+.skeleton-line.medium {
+  width: 35%;
+}
+
+.skeleton-line.large {
+  width: 58%;
+  height: 30px;
+  margin-top: 14px;
+}
+
+.skeleton-line.full {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.skeleton-pill {
+  height: 34px;
+  border-radius: 999px;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 1080px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-head,
+  .table-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

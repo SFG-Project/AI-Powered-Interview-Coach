@@ -4,7 +4,6 @@ backend/node_modules/
 frontend/dist/
 frontend/.angular/
 backend/.env
-.env
 .env.local
 .env.development
 .env.production

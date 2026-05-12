@@ -9,10 +9,12 @@
       <p>Update personal details and default interview options.</p>
     </article>
 
-    <p class="status-banner status-loading" *ngIf="isLoading">Loading settings...</p>
+    <article class="loading-panel" *ngIf="isLoading">
+      <app-loader label="Loading settings..." [centered]="false"></app-loader>
+    </article>
     <p class="status-banner status-error" *ngIf="loadErrorMessage">{{ loadErrorMessage }}</p>
 
-    <section class="settings-grid">
+    <section class="settings-grid" *ngIf="!isLoading">
       <article class="settings-card">
         <h2>Profile Settings</h2>
 
