@@ -4,7 +4,7 @@ import { Router, RouterLink } from "@angular/router";
 import { AuthService } from "../../../core/services/auth.service";
 import { environment } from "../../../../environments/environment";
 
-export type SidebarItemKey =
+type SidebarItemKey =
   | "admin-dashboard"
   | "interview-session"
   | "dashboard"
@@ -51,13 +51,11 @@ export class SidebarComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.isAdminVisible = this.authService.isAdmin();
     void this.initializeRoleState();
   }
 
   get visibleNavItems(): SidebarNavItem[] {
-    const hasAdminAccess = this.isAdminVisible || this.authService.isAdmin();
-    return this.navItems.filter((item) => !item.adminOnly || hasAdminAccess);
+    return this.navItems.filter((item) => !item.adminOnly || this.isAdminVisible);
   }
 
   onNavItemClick(item: SidebarNavItem): void {
@@ -70,8 +68,8 @@ export class SidebarComponent implements OnInit {
   }
 
   private async initializeRoleState(): Promise<void> {
-    const resolvedRole = await this.authService.ensureRoleFromSession();
-    this.isAdminVisible = resolvedRole === "admin";
+    await this.authService.ensureRoleFromSession();
+    this.isAdminVisible = this.authService.isAdmin();
     this.logSidebarRoleCheck();
   }
 

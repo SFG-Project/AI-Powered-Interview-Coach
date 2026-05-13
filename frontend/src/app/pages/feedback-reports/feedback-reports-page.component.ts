@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, OnInit, inject } from "@angular/core";
-import { AuthenticatedShellComponent } from "../../shared/components/authenticated-shell/authenticated-shell.component";
+import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
 import { AppLoaderComponent } from "../../shared/components/app-loader/app-loader.component";
 import {
   FeedbackReport,
@@ -15,7 +15,7 @@ type FeedbackReportsState = "loading" | "ready" | "empty" | "error";
 @Component({
   selector: "app-feedback-reports-page",
   standalone: true,
-  imports: [CommonModule, AuthenticatedShellComponent, AppLoaderComponent],
+  imports: [CommonModule, SidebarComponent, AppLoaderComponent],
   templateUrl: "./feedback-reports-page.component.html",
   styleUrls: ["./feedback-reports-page.component.css"],
 })

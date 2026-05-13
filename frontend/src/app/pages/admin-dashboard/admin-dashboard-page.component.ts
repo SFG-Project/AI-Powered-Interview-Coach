@@ -9,7 +9,7 @@ import {
   AdminRecentUserRow,
   AdminSystemSummaryRow,
 } from "../../core/services/admin-dashboard.service";
-import { AuthenticatedShellComponent } from "../../shared/components/authenticated-shell/authenticated-shell.component";
+import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
 
 type AdminDashboardState = "loading" | "ready" | "error";
 
@@ -90,7 +90,7 @@ const FALLBACK_ADMIN_DASHBOARD: AdminDashboardResponse = {
 @Component({
   selector: "app-admin-dashboard-page",
   standalone: true,
-  imports: [CommonModule, AuthenticatedShellComponent],
+  imports: [CommonModule, SidebarComponent],
   templateUrl: "./admin-dashboard-page.component.html",
   styleUrls: ["./admin-dashboard-page.component.css"],
 })
