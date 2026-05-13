@@ -8,10 +8,6 @@
         coaching feedback.
       </p>
       <a class="side-link" routerLink="/signup">Create account</a>
-
-      <div class="icon-row" aria-hidden="true">
-        <span>in</span>
-      </div>
     </aside>
 
     <section class="auth-form-panel">
@@ -26,7 +22,7 @@
       </div>
 
       <form novalidate (submit)="onSubmit($event)">
-        <label for="signin-identifier">Email or Admin</label>
+        <label for="signin-identifier">Email or Username</label>
         <input
           id="signin-identifier"
           type="text"
