@@ -85,6 +85,13 @@ cp .env.example .env
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
 - `FIREBASE_DATABASE_URL`
-- `FRONTEND_URL`
+- `FRONTEND_URL` (single allowed origin, no trailing slash)
+- `FRONTEND_URLS` (optional comma-separated extra origins)
+
+Production values used by this project:
+
+- Frontend `apiBaseUrl`: `https://ai-powered-interview-coach-eurt.onrender.com`
+- Backend `FRONTEND_URL`: your Netlify app origin (for example `https://your-site.netlify.app`)
+- Backend `FRONTEND_URLS`: optional preview/custom domains separated by commas
 
 If these are missing, backend still starts and skips Firebase Admin initialization.

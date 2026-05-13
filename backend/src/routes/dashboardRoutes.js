@@ -1,5 +1,5 @@
 const express = require("express");
-const { admin } = require("../config/firebaseAdmin");
+const { admin, isFirebaseAdminInitialized } = require("../config/firebaseAdmin");
 const { getDashboardForUser } = require("../services/dashboardService");
 
 function createDashboardRoutes({ requireAuthenticatedUser }) {
@@ -7,6 +7,17 @@ function createDashboardRoutes({ requireAuthenticatedUser }) {
 
   router.get("/me", requireAuthenticatedUser, async (req, res) => {
     logDashboardRouteHit(req.authUser?.uid);
+    if (!isFirebaseAdminInitialized()) {
+      console.warn(
+        "[dashboard/me] Firebase Admin is not initialized. Returning config error."
+      );
+      res.status(503).json({
+        message: "Firebase Admin credentials are not configured on the backend.",
+        errorCode: "firebase-admin-not-configured",
+        errorMessage: "Firebase Admin credentials are not configured on the backend.",
+      });
+      return;
+    }
 
     try {
       const payload = await getDashboardForUser(admin.firestore(), req.authUser.uid);
@@ -16,6 +27,10 @@ function createDashboardRoutes({ requireAuthenticatedUser }) {
       const code = typeof error?.code === "string" ? error.code : undefined;
       const message =
         error instanceof Error ? error.message : "Failed to load dashboard data.";
+      console.error("[dashboard/me] Failed to load dashboard data.", {
+        errorCode: code || "unknown",
+        errorMessage: message,
+      });
 
       res.status(500).json({
         message: "Failed to load dashboard data.",

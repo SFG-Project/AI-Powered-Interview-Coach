@@ -15,9 +15,11 @@ const { getFeedbackReportsForUser } = require("./services/feedbackReportsService
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL;
+const FRONTEND_URLS = process.env.FRONTEND_URLS;
 const USERS_COLLECTION = "users";
 const FIRESTORE_HEALTH_COLLECTION = "healthChecks";
 const FIRESTORE_HEALTH_DOC_ID = "landingPageConnectivityProbe";
+const NETLIFY_APP_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.netlify\.app$/i;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALLOWED_CAREER_FIELDS = [
   "Software Developer",
@@ -36,21 +38,25 @@ const DEFAULT_ADMIN_IDENTIFIER = "admin";
 const DEFAULT_ADMIN_EMAIL = "admin@sfg.com";
 const DEFAULT_ADMIN_PASSWORD = "Password123!";
 const DEFAULT_ADMIN_DISPLAY_NAME = "Admin";
+const corsConfiguration = createCorsConfiguration({
+  frontendUrl: FRONTEND_URL,
+  frontendUrls: FRONTEND_URLS,
+});
+const corsOptions = {
+  origin: corsConfiguration.originEvaluator,
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-user"],
+  optionsSuccessStatus: 200,
+};
 
-app.use(
-  cors(
-    FRONTEND_URL
-      ? {
-          origin: FRONTEND_URL,
-          methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-          allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-user"],
-        }
-      : undefined
-  )
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
+app.use(logApiRequestMetadata);
 
-initializeFirebaseAdmin();
+const firebaseAdminInitialization = initializeFirebaseAdmin();
+logCorsStartupConfiguration(corsConfiguration);
+logFirebaseStartupConfiguration(firebaseAdminInitialization);
 void seedDefaultAdminUser();
 logMissingCriticalEnvironmentVariables();
 app.use("/api/interview", interviewRoutes);
@@ -488,7 +494,10 @@ app.get("/api/admin/dashboard", requireAuthenticatedUser, requireAdminUser, (_re
   res.status(200).json(buildAdminDashboardPayload());
 });
 
-app.get("/api/firestore/health", async (_req, res) => {
+app.get("/api/firestore/health", async (req, res) => {
+  const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
+  console.info(`[firestore/health] GET hit from ${origin}.`);
+
   const firestore = getFirestoreOrRespond(res);
   if (!firestore) {
     return;
@@ -500,10 +509,16 @@ app.get("/api/firestore/health", async (_req, res) => {
       .doc(FIRESTORE_HEALTH_DOC_ID)
       .get();
 
+    console.info("[firestore/health] Connection check succeeded.");
     res.json({ status: "connected" });
   } catch (error) {
     const normalizedError = toSerializableError(error);
     const status = mapErrorCodeToStatus(normalizedError.code);
+    console.warn("[firestore/health] Connection check failed.", {
+      status,
+      errorCode: normalizedError.code || "unknown",
+      errorMessage: normalizedError.message,
+    });
 
     res.status(500).json({
       status,
@@ -682,9 +697,14 @@ function readBearerToken(authorizationHeader) {
 
 function getFirestoreForSettingsOrRespond(res) {
   if (!isFirebaseAdminInitialized()) {
-    res.status(500).json({
+    console.warn(
+      "[firestore/settings] Firebase Admin is not initialized. Returning config error."
+    );
+    res.status(503).json({
+      status: "config-error",
       message: "Firebase Admin credentials are not configured on the backend.",
       errorCode: "firebase-admin-not-configured",
+      errorMessage: "Firebase Admin credentials are not configured on the backend.",
     });
     return null;
   }
@@ -869,6 +889,9 @@ function getValidatedUserId(value) {
 
 function getFirestoreOrRespond(res) {
   if (!isFirebaseAdminInitialized()) {
+    console.warn(
+      "[firestore] Firebase Admin is not initialized. Returning config error."
+    );
     res.status(503).json({
       status: "config-error",
       errorCode: "firebase-admin-not-configured",
@@ -890,6 +913,146 @@ function mapErrorCodeToStatus(code) {
   }
 
   return "request-failed";
+}
+
+function logApiRequestMetadata(req, _res, next) {
+  if (!req.path.startsWith("/api/")) {
+    next();
+    return;
+  }
+
+  const origin = normalizeOrigin(req.headers.origin) || "no-origin-header";
+  const hasAuthorizationHeader = Boolean(readBearerToken(req.headers.authorization));
+  console.info("[api/request]", {
+    method: req.method,
+    path: req.path,
+    origin,
+    hasAuthorizationHeader,
+  });
+
+  next();
+}
+
+function createCorsConfiguration({ frontendUrl, frontendUrls }) {
+  const explicitOrigins = resolveConfiguredCorsOrigins(frontendUrl, frontendUrls);
+  const hasOnlyLocalOrigins =
+    explicitOrigins.length > 0 && explicitOrigins.every(isLocalDevelopmentOrigin);
+  const allowNetlifyOriginsFallback = !isDevelopmentEnvironment() && hasOnlyLocalOrigins;
+
+  return {
+    explicitOrigins,
+    allowNetlifyOriginsFallback,
+    originEvaluator(origin, callback) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (!normalizedOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      const isExplicitlyAllowed =
+        explicitOrigins.length === 0 || explicitOrigins.includes(normalizedOrigin);
+      const isNetlifyFallbackAllowed =
+        allowNetlifyOriginsFallback && NETLIFY_APP_ORIGIN_PATTERN.test(normalizedOrigin);
+      const isAllowed = isExplicitlyAllowed || isNetlifyFallbackAllowed;
+
+      if (!isAllowed) {
+        console.warn("[cors] Blocked request origin.", {
+          origin: normalizedOrigin,
+          explicitOrigins,
+          allowNetlifyOriginsFallback,
+        });
+      }
+
+      callback(null, isAllowed);
+    },
+  };
+}
+
+function resolveConfiguredCorsOrigins(frontendUrl, frontendUrls) {
+  const rawInputs = [frontendUrl, frontendUrls]
+    .filter((value) => typeof value === "string")
+    .join(",");
+
+  if (!rawInputs.trim()) {
+    return [];
+  }
+
+  const normalizedOrigins = rawInputs
+    .split(/[,\n]/)
+    .map((value) => normalizeOrigin(value))
+    .filter((value) => Boolean(value));
+
+  return Array.from(new Set(normalizedOrigins));
+}
+
+function normalizeOrigin(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return `${url.protocol}//${url.host}`.toLowerCase();
+  } catch {
+    return trimmed.replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+function isLocalDevelopmentOrigin(origin) {
+  if (typeof origin !== "string") {
+    return false;
+  }
+
+  return (
+    origin.startsWith("http://localhost") ||
+    origin.startsWith("https://localhost") ||
+    origin.startsWith("http://127.0.0.1") ||
+    origin.startsWith("https://127.0.0.1")
+  );
+}
+
+function logCorsStartupConfiguration(configuration) {
+  if (!configuration || typeof configuration !== "object") {
+    return;
+  }
+
+  const explicitOrigins = Array.isArray(configuration.explicitOrigins)
+    ? configuration.explicitOrigins
+    : [];
+
+  if (!explicitOrigins.length) {
+    console.warn(
+      "[cors] FRONTEND_URL/FRONTEND_URLS not configured. Allowing requests from any origin."
+    );
+  } else {
+    console.info("[cors] Explicitly allowed origins:", explicitOrigins);
+  }
+
+  if (configuration.allowNetlifyOriginsFallback) {
+    console.warn(
+      "[cors] Only localhost origins were configured in production. Temporarily allowing *.netlify.app origins."
+    );
+  }
+}
+
+function logFirebaseStartupConfiguration(initializationResult) {
+  const initialized = initializationResult?.initialized === true;
+  console.info("[firebase-admin/startup] Initialization summary.", {
+    initialized,
+    serviceAccountPathConfigured: Boolean(
+      getTrimmedString(process.env.FIREBASE_SERVICE_ACCOUNT_PATH)
+    ),
+    projectIdConfigured: Boolean(getTrimmedString(process.env.FIREBASE_PROJECT_ID)),
+    clientEmailConfigured: Boolean(getTrimmedString(process.env.FIREBASE_CLIENT_EMAIL)),
+    privateKeyConfigured: Boolean(getTrimmedString(process.env.FIREBASE_PRIVATE_KEY)),
+    databaseUrlConfigured: Boolean(getTrimmedString(process.env.FIREBASE_DATABASE_URL)),
+  });
 }
 
 function toSerializableError(error) {
