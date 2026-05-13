@@ -1,6 +1,4 @@
-<main class="progress-page">
-  <app-sidebar [activeItem]="'progress'"></app-sidebar>
-
+<app-authenticated-shell [activeItem]="'progress'" [pageClass]="'progress-page'">
   <section class="progress-content">
     <h1>Progress</h1>
 
@@ -50,4 +48,4 @@
       </article>
     </section>
   </section>
-</main>
+</app-authenticated-shell>

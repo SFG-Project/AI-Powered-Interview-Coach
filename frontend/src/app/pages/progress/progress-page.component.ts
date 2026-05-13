@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, OnInit, inject } from "@angular/core";
-import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
+import { AuthenticatedShellComponent } from "../../shared/components/authenticated-shell/authenticated-shell.component";
 import { AppLoaderComponent } from "../../shared/components/app-loader/app-loader.component";
 import {
   InterviewScoreItem,
@@ -35,7 +35,7 @@ const ZERO_OVERVIEW = {
 @Component({
   selector: "app-progress-page",
   standalone: true,
-  imports: [CommonModule, SidebarComponent, AppLoaderComponent],
+  imports: [CommonModule, AuthenticatedShellComponent, AppLoaderComponent],
   templateUrl: "./progress-page.component.html",
   styleUrls: ["./progress-page.component.css"],
 })

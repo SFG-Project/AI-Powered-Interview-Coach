@@ -1,14 +1,7 @@
-<main class="interview-page">
-  <app-sidebar [activeItem]="'interview-session'"></app-sidebar>
-
+<app-authenticated-shell [activeItem]="'interview-session'" [pageClass]="'interview-page'">
   <section class="interview-content">
     <header class="page-header">
       <h1>Interview Session</h1>
-
-      <div class="user-chip">
-        <span class="avatar">{{ userInitial }}</span>
-        <span>{{ userName }}</span>
-      </div>
     </header>
 
     <section class="setup-card" *ngIf="!hasSession">
@@ -252,4 +245,4 @@
       </section>
     </ng-container>
   </section>
-</main>
+</app-authenticated-shell>

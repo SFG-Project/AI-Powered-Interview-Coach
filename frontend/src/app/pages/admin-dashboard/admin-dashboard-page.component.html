@@ -1,17 +1,12 @@
-<main class="admin-page">
-  <app-sidebar
-    [activeItem]="'admin-dashboard'"
-    [brandLabel]="'AI Coach Admin'"
-    [footerLabel]="'Admin Panel'"
-  ></app-sidebar>
-
+<app-authenticated-shell
+  [activeItem]="'admin-dashboard'"
+  [pageClass]="'admin-page'"
+  [brandLabel]="'AI Coach Admin'"
+  [footerLabel]="'Admin Panel'"
+>
   <section class="admin-content">
     <header class="admin-header">
       <h1>Admin Dashboard</h1>
-      <div class="admin-user-chip">
-        <span class="admin-avatar">{{ dashboard.adminUser.avatarText }}</span>
-        <span>{{ dashboard.adminUser.name }}</span>
-      </div>
     </header>
 
     <article class="status-card status-card-error" *ngIf="state === 'error'">
@@ -117,4 +112,4 @@
       </section>
     </section>
   </section>
-</main>
+</app-authenticated-shell>

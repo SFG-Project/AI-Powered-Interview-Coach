@@ -1,6 +1,4 @@
-<main class="settings-page">
-  <app-sidebar [activeItem]="'settings'"></app-sidebar>
-
+<app-authenticated-shell [activeItem]="'settings'" [pageClass]="'settings-page'">
   <section class="settings-content">
     <h1>Settings</h1>
 
@@ -130,4 +128,4 @@
       </article>
     </section>
   </section>
-</main>
+</app-authenticated-shell>

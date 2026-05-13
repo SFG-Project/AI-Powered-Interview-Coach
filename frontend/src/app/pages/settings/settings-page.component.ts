@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { Component, OnInit, inject } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
-import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
+import { AuthenticatedShellComponent } from "../../shared/components/authenticated-shell/authenticated-shell.component";
 import { AppLoaderComponent } from "../../shared/components/app-loader/app-loader.component";
 import {
   CAREER_FIELDS,
@@ -19,7 +19,7 @@ import {
 @Component({
   selector: "app-settings-page",
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, SidebarComponent, AppLoaderComponent],
+  imports: [CommonModule, ReactiveFormsModule, AuthenticatedShellComponent, AppLoaderComponent],
   templateUrl: "./settings-page.component.html",
   styleUrls: ["./settings-page.component.css"],
 })

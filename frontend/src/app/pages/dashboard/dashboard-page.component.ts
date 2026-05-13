@@ -7,8 +7,8 @@ import {
   DashboardResponse,
   DashboardService,
 } from "../../core/services/dashboard.service";
+import { AuthenticatedShellComponent } from "../../shared/components/authenticated-shell/authenticated-shell.component";
 import { DashboardSkeletonComponent } from "../../shared/components/dashboard-skeleton/dashboard-skeleton.component";
-import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
 
 interface SummaryCard {
   label: string;
@@ -27,7 +27,7 @@ type DashboardState = "loading" | "ready" | "empty" | "error";
 @Component({
   selector: "app-dashboard-page",
   standalone: true,
-  imports: [CommonModule, SidebarComponent, RouterLink, DashboardSkeletonComponent],
+  imports: [CommonModule, AuthenticatedShellComponent, RouterLink, DashboardSkeletonComponent],
   templateUrl: "./dashboard-page.component.html",
   styleUrls: ["./dashboard-page.component.css"],
 })

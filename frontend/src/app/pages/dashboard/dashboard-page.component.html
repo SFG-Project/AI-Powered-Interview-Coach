@@ -1,6 +1,4 @@
-<main class="dashboard-page">
-  <app-sidebar [activeItem]="'dashboard'"></app-sidebar>
-
+<app-authenticated-shell [activeItem]="'dashboard'" [pageClass]="'dashboard-page'">
   <section class="dashboard-content">
     <h1>Dashboard</h1>
 
@@ -70,4 +68,4 @@
       </section>
     </ng-container>
   </section>
-</main>
+</app-authenticated-shell>

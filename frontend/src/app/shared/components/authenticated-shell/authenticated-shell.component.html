@@ -1,0 +1,15 @@
+<main [class]="pageClass">
+  <app-sidebar
+    [activeItem]="activeItem"
+    [brandLabel]="brandLabel"
+    [footerLabel]="footerLabel"
+  ></app-sidebar>
+
+  <section class="authenticated-shell-body">
+    <div class="authenticated-shell-user-chip">
+      <span class="authenticated-shell-avatar">{{ userInitial }}</span>
+      <span>{{ userDisplayName }}</span>
+    </div>
+    <ng-content></ng-content>
+  </section>
+</main>
