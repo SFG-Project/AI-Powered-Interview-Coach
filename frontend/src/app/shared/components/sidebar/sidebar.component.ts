@@ -1,7 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { Component, Input, OnInit } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
-import { AuthService } from '../../../core/services/auth.service';
+import { AuthService } from "../../../core/services/auth.service";
 import { environment } from "../../../../environments/environment";
 
 type SidebarItemKey =
@@ -31,6 +31,7 @@ export class SidebarComponent implements OnInit {
   @Input() activeItem: SidebarItemKey = "dashboard";
   @Input() brandLabel = "AI Coach";
   @Input() footerLabel = "Practice smarter, interview better.";
+  isAdminVisible = false;
 
   constructor(private authService: AuthService, private router: Router) {}
 
@@ -50,18 +51,11 @@ export class SidebarComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    if (environment.production) {
-      return;
-    }
-
-    console.info("[sidebar] Role check.", {
-      role: this.authService.getRole(),
-      isAdmin: this.authService.isAdmin(),
-    });
+    void this.initializeRoleState();
   }
 
   get visibleNavItems(): SidebarNavItem[] {
-    return this.navItems.filter((item) => !item.adminOnly || this.authService.isAdmin());
+    return this.navItems.filter((item) => !item.adminOnly || this.isAdminVisible);
   }
 
   onNavItemClick(item: SidebarNavItem): void {
@@ -71,5 +65,24 @@ export class SidebarComponent implements OnInit {
     } else if (item.route) {
       this.router.navigate([item.route]);
     }
+  }
+
+  private async initializeRoleState(): Promise<void> {
+    await this.authService.ensureRoleFromSession();
+    this.isAdminVisible = this.authService.isAdmin();
+    this.logSidebarRoleCheck();
+  }
+
+  private logSidebarRoleCheck(): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[sidebar] Admin visibility check.", {
+      role: this.authService.getRole(),
+      isAdmin: this.authService.isAdmin(),
+      isAdminVisible: this.isAdminVisible,
+      currentUser: this.authService.getCurrentUser(),
+    });
   }
 }

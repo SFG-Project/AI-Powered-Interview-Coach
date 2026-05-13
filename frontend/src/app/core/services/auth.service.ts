@@ -27,12 +27,20 @@ interface SignInResponsePayload {
   email?: string;
 }
 
+export interface StoredAuthUser {
+  uid: string;
+  email: string;
+  role: UserRole;
+  isAdmin: boolean;
+}
+
 @Injectable({ providedIn: "root" })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokenKey = "authToken";
   private readonly roleKey = "authRole";
   private readonly userIdKey = "authUserId";
+  private readonly currentUserKey = "authCurrentUser";
   private readonly authApiBaseUrl = this.buildAuthApiBaseUrl();
 
   async signIn(identifier: string, password: string): Promise<void> {
@@ -67,13 +75,18 @@ export class AuthService {
       }
 
       const role = await this.resolveRoleAfterSignIn(response.body);
-      sessionStorage.setItem(this.roleKey, role);
+      this.persistRole(role);
+      this.persistCurrentUser({
+        uid: localId,
+        email: this.normalizeEmail(response.body?.email),
+        role,
+        isAdmin: role === "admin",
+      });
       this.logStoredAuthStateForDevelopment(role, localId);
     } catch (error) {
       this.logSignInErrorForDevelopment(signInUrl, this.getErrorDetails(error));
       throw error;
     }
-
   }
 
   getToken(): string | null {
@@ -84,6 +97,7 @@ export class AuthService {
     sessionStorage.removeItem(this.tokenKey);
     sessionStorage.removeItem(this.roleKey);
     sessionStorage.removeItem(this.userIdKey);
+    sessionStorage.removeItem(this.currentUserKey);
   }
 
   isAuthenticated(): boolean {
@@ -95,7 +109,68 @@ export class AuthService {
   }
 
   getRole(): UserRole {
-    return this.normalizeRole(sessionStorage.getItem(this.roleKey));
+    const storedRole = sessionStorage.getItem(this.roleKey);
+    if (typeof storedRole === "string" && storedRole.trim()) {
+      return this.normalizeRole(storedRole);
+    }
+
+    const currentUser = this.getCurrentUser();
+    return this.normalizeRole(currentUser?.role);
+  }
+
+  getCurrentUser(): StoredAuthUser | null {
+    const serializedCurrentUser = sessionStorage.getItem(this.currentUserKey);
+    if (!serializedCurrentUser) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(serializedCurrentUser) as Partial<StoredAuthUser> | null;
+      const uid = typeof parsed?.uid === "string" ? parsed.uid.trim() : "";
+      const email = this.normalizeEmail(parsed?.email);
+      const role = this.normalizeRole(parsed?.role);
+
+      if (!uid) {
+        return null;
+      }
+
+      return {
+        uid,
+        email,
+        role,
+        isAdmin: role === "admin",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async ensureRoleFromSession(): Promise<UserRole> {
+    if (!this.isAuthenticated()) {
+      return "user";
+    }
+
+    const storedRole = sessionStorage.getItem(this.roleKey);
+    if (typeof storedRole === "string" && storedRole.trim()) {
+      return this.normalizeRole(storedRole);
+    }
+
+    const roleFromSession = await this.fetchRoleFromSession();
+    if (roleFromSession) {
+      this.persistRole(roleFromSession);
+      const existingUser = this.getCurrentUser();
+      const storedUserId = sessionStorage.getItem(this.userIdKey);
+      const fallbackUid = typeof storedUserId === "string" ? storedUserId.trim() : "";
+      this.persistCurrentUser({
+        uid: existingUser?.uid || fallbackUid,
+        email: existingUser?.email || "",
+        role: roleFromSession,
+        isAdmin: roleFromSession === "admin",
+      });
+      return roleFromSession;
+    }
+
+    return this.getRole();
   }
 
   async signUp(payload: SignUpPayload): Promise<void> {
@@ -339,10 +414,41 @@ export class AuthService {
       return;
     }
 
+    const currentUser = this.getCurrentUser();
     console.info("[auth/signin] Stored auth state.", {
       role,
       localIdFound: Boolean(localId),
       tokenFound: Boolean(this.getToken()),
+      currentUser,
     });
+  }
+
+  private persistRole(role: UserRole): void {
+    sessionStorage.setItem(this.roleKey, role);
+  }
+
+  private persistCurrentUser(currentUser: StoredAuthUser): void {
+    const uid = typeof currentUser.uid === "string" ? currentUser.uid.trim() : "";
+    if (!uid) {
+      sessionStorage.removeItem(this.currentUserKey);
+      return;
+    }
+
+    const normalizedCurrentUser: StoredAuthUser = {
+      uid,
+      email: this.normalizeEmail(currentUser.email),
+      role: this.normalizeRole(currentUser.role),
+      isAdmin: this.normalizeRole(currentUser.role) === "admin",
+    };
+
+    sessionStorage.setItem(this.currentUserKey, JSON.stringify(normalizedCurrentUser));
+  }
+
+  private normalizeEmail(value: unknown): string {
+    if (typeof value !== "string") {
+      return "";
+    }
+
+    return value.trim().toLowerCase();
   }
 }

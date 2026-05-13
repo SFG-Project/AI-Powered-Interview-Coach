@@ -106,13 +106,16 @@ export class AdminDashboardPageComponent implements OnInit {
 
   async loadDashboard(): Promise<void> {
     this.state = "loading";
+    this.logDashboardLoad("start");
 
     try {
       this.dashboard = await this.adminDashboardService.getDashboard();
       this.state = "ready";
+      this.logDashboardLoad("success");
     } catch (error) {
       this.state = "error";
       this.dashboard = FALLBACK_ADMIN_DASHBOARD;
+      this.logDashboardLoad("fallback");
       if (!environment.production) {
         console.error("[admin/dashboard] Failed to load admin dashboard data.", error);
       }
@@ -161,5 +164,21 @@ export class AdminDashboardPageComponent implements OnInit {
     if (!environment.production) {
       console.info(`[admin/actions] Triggered action: ${action.action}`);
     }
+  }
+
+  private logDashboardLoad(stage: "start" | "success" | "fallback"): void {
+    if (environment.production) {
+      return;
+    }
+
+    console.info("[admin/dashboard] Load state.", {
+      stage,
+      summaryCards: this.dashboard.summaryCards.length,
+      recentUsers: this.dashboard.recentUsers.length,
+      recentInterviewReports: this.dashboard.recentInterviewReports.length,
+      systemSummary: this.dashboard.systemSummary.length,
+      performanceOverview: this.dashboard.performanceOverview.length,
+      adminActions: this.dashboard.adminActions.length,
+    });
   }
 }

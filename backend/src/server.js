@@ -228,6 +228,12 @@ app.post("/api/auth/signin", async (req, res) => {
     const role = await getUserRoleForUid(localId, getTrimmedString(body.email));
     const isAdmin = role === USER_ROLE_ADMIN;
     logSignInRoleResolution(normalizedEmail, role, localId);
+    logSignInResponsePayload(normalizedEmail, {
+      localId,
+      role,
+      isAdmin,
+      idToken: getTrimmedString(body.idToken),
+    });
 
     res.json({
       idToken: getTrimmedString(body.idToken),
@@ -1201,6 +1207,7 @@ async function seedDefaultAdminUser() {
     console.info(
       `[admin/seed] Default admin ready. role=${USER_ROLE_ADMIN}. Sign-in identifier="${adminIdentifier}" maps to ${adminEmail}.`
     );
+    logSeededAdminRecord(adminUser.uid, adminEmail, adminIdentifier);
   } catch (error) {
     const serializedError = toSerializableError(error);
     console.warn(
@@ -1357,6 +1364,36 @@ function logSignInRoleResolution(email, role, uid) {
   console.info(
     `[auth/signin] Role resolved for ${maskedEmail}. role=${normalizedRole}. uidFound=${hasUid}.`
   );
+}
+
+function logSignInResponsePayload(email, payload) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const maskedEmail = maskEmail(email);
+  console.info("[auth/signin] Response payload summary.", {
+    email: maskedEmail,
+    role: normalizeUserRole(payload?.role),
+    isAdmin: payload?.isAdmin === true,
+    localIdFound: typeof payload?.localId === "string" && Boolean(payload.localId.trim()),
+    idTokenFound: typeof payload?.idToken === "string" && Boolean(payload.idToken.trim()),
+  });
+}
+
+function logSeededAdminRecord(uid, email, identifier) {
+  if (!isDevelopmentEnvironment()) {
+    return;
+  }
+
+  const maskedEmail = maskEmail(email);
+  const hasUid = typeof uid === "string" && Boolean(uid.trim());
+  console.info("[admin/seed] Seeded admin record.", {
+    identifier,
+    email: maskedEmail,
+    role: USER_ROLE_ADMIN,
+    uidFound: hasUid,
+  });
 }
 
 function logProgressRouteHit(uid) {
