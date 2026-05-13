@@ -5,20 +5,26 @@ const DEFAULT_CAREER_FIELD = "Software Developer";
 const DEFAULT_INTERVIEW_TYPE = "Technical";
 const DEFAULT_DIFFICULTY = "Medium";
 const FALLBACK_USER_ID = "anonymous";
+require("dotenv").config();
 
 const ALLOWED_CAREER_FIELDS = [
-  "Software Developer",
-  "Data Analyst",
-  "Business Analyst",
-  "Project Manager",
-  "Cybersecurity Analyst",
-  "Other",
+    "Software Development",
+    "Finance",
+    "Healthcare",
+    "Education",
+    "Marketing",
+    "Engineering",
+    "Human Resources",
+    "Sales",
+    "Customer Support",
+    "Other",
 ];
 
 const ALLOWED_INTERVIEW_TYPES = ["Technical", "Behavioural", "HR", "Mixed"];
 const ALLOWED_DIFFICULTIES = ["Easy", "Medium", "Hard"];
 const ALLOWED_QUESTION_COUNTS = [3, 5, 10];
 const METRIC_STATUSES = [
+  "Not Rated",
   "Poor",
   "Improving",
   "Moderate",
@@ -161,18 +167,68 @@ function parseQuestionCount(value) {
   return null;
 }
 
-function normalizeMetricStatus(value, fallback) {
+function normalizeMetricStatus(value, fallback = "Moderate") {
   if (typeof value !== "string") {
     return fallback;
   }
 
-  const match = METRIC_STATUSES.find(
-    (option) => option.toLowerCase() === value.trim().toLowerCase()
+  const normalized = value.trim().toLowerCase();
+
+  // Exact matches
+  const exactMatch = METRIC_STATUSES.find(
+    (option) => option.toLowerCase() === normalized
   );
 
-  return match || fallback;
-}
+  if (exactMatch) {
+    return exactMatch;
+  }
 
+  // AI wording mapping
+  if (
+    normalized.includes("excellent") ||
+    normalized.includes("outstanding")
+  ) {
+    return "Excellent";
+  }
+
+  if (
+    normalized.includes("strong") ||
+    normalized.includes("very good")
+  ) {
+    return "Strong";
+  }
+
+  if (
+    normalized.includes("good") ||
+    normalized.includes("clear")
+  ) {
+    return "Good";
+  }
+
+  if (
+    normalized.includes("average") ||
+    normalized.includes("fair") ||
+    normalized.includes("moderate")
+  ) {
+    return "Moderate";
+  }
+
+  if (
+    normalized.includes("improve") ||
+    normalized.includes("developing")
+  ) {
+    return "Improving";
+  }
+
+  if (
+    normalized.includes("weak") ||
+    normalized.includes("poor")
+  ) {
+    return "Poor";
+  }
+
+  return fallback;
+}
 function clampScore(value) {
   const score = Number(value);
   if (!Number.isFinite(score)) {
@@ -275,25 +331,32 @@ function parseJsonObject(rawContent) {
 }
 
 function hasXaiConfig() {
-  return Boolean(process.env.XAI_API_KEY);
+  return Boolean(process.env.GROQ_API_KEY);
 }
 
 function getXaiConfig() {
   return {
-    apiKey: process.env.XAI_API_KEY || "",
-    baseUrl: (process.env.XAI_BASE_URL || "https://api.x.ai/v1").replace(
+    apiKey: process.env.GROQ_API_KEY || "",
+    baseUrl: (process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").replace(
       /\/$/,
       ""
     ),
-    model: process.env.XAI_MODEL || "grok-4.3",
+    model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
   };
 }
-
 async function callXaiChat(messages) {
   const { apiKey, baseUrl, model } = getXaiConfig();
+
   const endpoint = `${baseUrl}/chat/completions`;
+
+  console.log("========== GROQ DEBUG ==========");
+  console.log("API KEY EXISTS:", Boolean(apiKey));
+  console.log("ENDPOINT:", endpoint);
+  console.log("MODEL:", model);
+  console.log("================================");
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
     const response = await fetch(endpoint, {
@@ -306,33 +369,52 @@ async function callXaiChat(messages) {
         model,
         messages,
         temperature: 0.4,
+        response_format: { type: "json_object" },
       }),
       signal: controller.signal,
     });
 
+    const rawText = await response.text();
+
+    console.log("========== GROQ RESPONSE ==========");
+    console.log(rawText);
+    console.log("===================================");
+
     if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`xAI request failed (${response.status}): ${body}`);
+      throw new Error(
+        `Groq request failed (${response.status}): ${rawText}`
+      );
     }
 
-    const payload = await response.json();
-    const messageContent = payload?.choices?.[0]?.message?.content;
+    const payload = JSON.parse(rawText);
+
+    const messageContent =
+      payload?.choices?.[0]?.message?.content;
 
     if (!messageContent) {
-      throw new Error("xAI returned an empty response.");
+      throw new Error("Groq returned empty content.");
     }
 
-    const parsed = parseJsonObject(messageContent);
-    if (!parsed) {
-      throw new Error("xAI response was not valid JSON.");
+    let parsed;
+
+    try {
+      parsed = JSON.parse(messageContent);
+    } catch (err) {
+      console.error("FAILED TO PARSE AI JSON:");
+      console.error(messageContent);
+
+      throw new Error("Groq returned invalid JSON.");
     }
 
     return parsed;
+
+  } catch (error) {
+    console.error("GROQ ERROR:", error.message);
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
 }
-
 function normalizeQuestionSource(value, fallback = "unknown") {
   if (typeof value !== "string") {
     return fallback;
@@ -468,38 +550,34 @@ function buildFallbackQuestions({
 function defaultFeedback(skipped = false) {
   if (skipped) {
     return {
-      score: 5.8,
-      summary: "Question skipped. The session moved to the next question.",
-      clarity: "Moderate",
-      technicalAccuracy: "Moderate",
-      confidence: "Improving",
-      communication: "Moderate",
-      quickTip: "Give a direct opening sentence before expanding the answer.",
-      sessionNotes: "Try to attempt each question with at least one example.",
-      strengths: ["You kept the session moving forward."],
-      improvements: ["Attempt the question before skipping when possible."],
-      suggestedAnswer:
-        "A stronger answer should include a concise definition, explanation, and practical example.",
+      score: 0,
+      summary: "Question skipped. No score was given.",
+      clarity: "Not Rated",
+      technicalAccuracy: "Not Rated",
+      confidence: "Not Rated",
+      communication: "Not Rated",
+      quickTip: "Try to answer before skipping so your performance can be evaluated.",
+      sessionNotes: "Skipped questions are not rated.",
+      strengths: [],
+      improvements: ["Attempt the question before skipping."],
+      suggestedAnswer: "",
     };
   }
 
   return {
-    score: 6.5,
-    summary: "Your answer was recorded successfully.",
-    clarity: "Good",
-    technicalAccuracy: "Moderate",
-    confidence: "Improving",
-    communication: "Good",
-    quickTip: "Use a clear structure and include a practical example.",
-    sessionNotes:
-      "Try to expand your explanation and link it to the role.",
-    strengths: ["You attempted the question clearly."],
-    improvements: ["Add more specific examples."],
-    suggestedAnswer:
-      "A stronger answer should include a definition, explanation, and example.",
+    score: 0,
+    summary: "Your answer was saved, but AI feedback could not be generated.",
+    clarity: "Not Rated",
+    technicalAccuracy: "Not Rated",
+    confidence: "Not Rated",
+    communication: "Not Rated",
+    quickTip: "Please check the AI API connection.",
+    sessionNotes: "Fallback feedback was used because the AI evaluation failed.",
+    strengths: [],
+    improvements: [],
+    suggestedAnswer: "",
   };
 }
-
 function normalizeFeedback(payload, skipped = false) {
   const fallback = defaultFeedback(skipped);
 
@@ -644,9 +722,91 @@ async function evaluateAnswerWithAi({ session, question, answer, skipped }) {
       role: "user",
       content: JSON.stringify({
         task: "evaluate_interview_answer",
-        instructions:
-          "Return JSON with fields: score, summary, clarity, technicalAccuracy, confidence, communication, quickTip, sessionNotes, strengths, improvements, suggestedAnswer.",
-        sessionContext: {
+       instructions:
+  `
+Return STRICT JSON only.
+
+You are an experienced technical interview evaluator.
+
+Evaluate the candidate answer carefully based on:
+- relevance to the question
+- technical correctness
+- depth of explanation
+- communication quality
+- confidence and clarity
+- structure of the answer
+- use of examples
+- problem-solving ability
+
+IMPORTANT:
+Do NOT give the same rating for all metrics unless the answer truly deserves it.
+
+Each metric must be evaluated independently:
+- clarity
+- technicalAccuracy
+- confidence
+- communication
+
+Use realistic variation between metrics.
+
+For example:
+- Someone may communicate well but be technically weak.
+- Someone may be technically strong but unclear.
+- Someone may sound confident but give inaccurate answers.
+
+SCORING RULES:
+- score must be between 0 and 10
+- use decimals when appropriate (example: 6.5)
+- avoid always using high scores
+- short or vague answers should score lower
+- incorrect technical answers must reduce technicalAccuracy heavily
+- skipped or empty answers should score near 0
+
+For clarity, technicalAccuracy, confidence, and communication,
+you MUST ONLY use ONE of these exact values:
+
+Poor
+Improving
+Moderate
+Good
+Strong
+Excellent
+
+Return JSON with these exact fields:
+
+{
+  "score": number,
+  "summary": string,
+  "clarity": string,
+  "technicalAccuracy": string,
+  "confidence": string,
+  "communication": string,
+  "quickTip": string,
+  "sessionNotes": string,
+  "strengths": string[],
+  "improvements": string[],
+  "suggestedAnswer": string
+}
+
+strengths:
+- include 1 to 3 concise strengths
+- do not repeat the same idea
+
+improvements:
+- include 1 to 3 specific improvements
+- be constructive and actionable
+
+quickTip:
+- must be short and practical
+
+suggestedAnswer:
+- provide a stronger example answer
+- keep it concise but realistic
+
+Do not include markdown.
+Do not include explanations outside JSON.
+Do not wrap JSON in triple backticks.
+`,        sessionContext: {
           careerField: session.careerField,
           interviewType: session.interviewType,
           difficulty: session.difficulty,

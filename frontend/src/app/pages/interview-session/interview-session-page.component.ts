@@ -26,16 +26,14 @@ interface ChatMessage {
 }
 
 const PLACEHOLDER_FEEDBACK: InterviewFeedback = {
-  score: 7.5,
+  score: 0,
   summary: "",
-  clarity: "Good",
-  technicalAccuracy: "Strong",
-  confidence: "Moderate",
-  communication: "Improving",
-  quickTip:
-    "A strong answer should have a definition, short explanation, and real example.",
-  sessionNotes:
-    "Try to sound more confident and expand your explanation before the example.",
+  clarity: "",
+  technicalAccuracy: "",
+  confidence: "",
+  communication: "",
+  quickTip: "",
+  sessionNotes: "",
   strengths: [],
   improvements: [],
   suggestedAnswer: "",
@@ -54,11 +52,15 @@ export class InterviewSessionPageComponent implements OnInit, OnDestroy {
   private isAutoSkipping = false;
 
   readonly careerFieldOptions = [
-    "Software Developer",
-    "Data Analyst",
-    "Business Analyst",
-    "Project Manager",
-    "Cybersecurity Analyst",
+    "Software Development",
+    "Finance",
+    "Healthcare",
+    "Education",
+    "Marketing",
+    "Engineering",
+    "Human Resources",
+    "Sales",
+    "Customer Support",
     "Other",
   ];
 
