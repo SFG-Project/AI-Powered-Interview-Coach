@@ -937,7 +937,9 @@ function createCorsConfiguration({ frontendUrl, frontendUrls }) {
   const explicitOrigins = resolveConfiguredCorsOrigins(frontendUrl, frontendUrls);
   const hasOnlyLocalOrigins =
     explicitOrigins.length > 0 && explicitOrigins.every(isLocalDevelopmentOrigin);
-  const allowNetlifyOriginsFallback = !isDevelopmentEnvironment() && hasOnlyLocalOrigins;
+  const hasConfiguredNetlifyOrigin = hasAnyConfiguredNetlifyOrigin(frontendUrl, frontendUrls);
+  const allowNetlifyOriginsFallback =
+    !isDevelopmentEnvironment() && (hasOnlyLocalOrigins || hasConfiguredNetlifyOrigin);
 
   return {
     explicitOrigins,
@@ -970,6 +972,14 @@ function createCorsConfiguration({ frontendUrl, frontendUrls }) {
 }
 
 function resolveConfiguredCorsOrigins(frontendUrl, frontendUrls) {
+  const normalizedOrigins = resolveConfiguredCorsOriginInputs(frontendUrl, frontendUrls)
+    .map((value) => normalizeOrigin(value))
+    .filter((value) => Boolean(value));
+
+  return Array.from(new Set(normalizedOrigins));
+}
+
+function resolveConfiguredCorsOriginInputs(frontendUrl, frontendUrls) {
   const rawInputs = [frontendUrl, frontendUrls]
     .filter((value) => typeof value === "string")
     .join(",");
@@ -978,12 +988,17 @@ function resolveConfiguredCorsOrigins(frontendUrl, frontendUrls) {
     return [];
   }
 
-  const normalizedOrigins = rawInputs
+  return rawInputs
     .split(/[,\n;\s]+/)
-    .map((value) => normalizeOrigin(value))
+    .map((value) => unwrapQuotedString(value))
     .filter((value) => Boolean(value));
+}
 
-  return Array.from(new Set(normalizedOrigins));
+function hasAnyConfiguredNetlifyOrigin(frontendUrl, frontendUrls) {
+  return resolveConfiguredCorsOriginInputs(frontendUrl, frontendUrls).some((value) => {
+    const normalizedOrigin = normalizeOrigin(value);
+    return Boolean(normalizedOrigin) && NETLIFY_APP_ORIGIN_PATTERN.test(normalizedOrigin);
+  });
 }
 
 function normalizeOrigin(value) {
@@ -1063,7 +1078,7 @@ function logCorsStartupConfiguration(configuration) {
 
   if (configuration.allowNetlifyOriginsFallback) {
     console.warn(
-      "[cors] Only localhost origins were configured in production. Temporarily allowing *.netlify.app origins."
+      "[cors] Netlify origin fallback enabled in production. Allowing *.netlify.app origins in addition to explicit origins."
     );
   }
 }
