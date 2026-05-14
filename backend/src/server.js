@@ -979,7 +979,7 @@ function resolveConfiguredCorsOrigins(frontendUrl, frontendUrls) {
   }
 
   const normalizedOrigins = rawInputs
-    .split(/[,\n]/)
+    .split(/[,\n;\s]+/)
     .map((value) => normalizeOrigin(value))
     .filter((value) => Boolean(value));
 
@@ -991,7 +991,7 @@ function normalizeOrigin(value) {
     return null;
   }
 
-  const trimmed = value.trim();
+  const trimmed = unwrapQuotedString(value);
   if (!trimmed) {
     return null;
   }
@@ -1002,6 +1002,33 @@ function normalizeOrigin(value) {
   } catch {
     return trimmed.replace(/\/+$/, "").toLowerCase();
   }
+}
+
+function unwrapQuotedString(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.length < 2) {
+    return trimmed;
+  }
+
+  const firstCharacter = trimmed[0];
+  const lastCharacter = trimmed[trimmed.length - 1];
+  const hasWrappingQuotes =
+    (firstCharacter === '"' || firstCharacter === "'" || firstCharacter === "`") &&
+    firstCharacter === lastCharacter;
+
+  if (!hasWrappingQuotes) {
+    return trimmed;
+  }
+
+  return trimmed.slice(1, -1).trim();
 }
 
 function isLocalDevelopmentOrigin(origin) {
