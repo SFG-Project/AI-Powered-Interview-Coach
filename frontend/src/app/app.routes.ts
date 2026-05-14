@@ -16,6 +16,7 @@ export const routes: Routes = [
       ),
     canActivate: [AuthGuard, AdminGuard],
   },
+  { path: "admin-dashboard", redirectTo: "admin", pathMatch: "full" },
 
   { path: "interview-session", loadComponent: () => import('./pages/interview-session/interview-session-page.component').then(m => m.InterviewSessionPageComponent), canActivate: [AuthGuard] },
   { path: "progress", loadComponent: () => import('./pages/progress/progress-page.component').then(m => m.ProgressPageComponent), canActivate: [AuthGuard] },

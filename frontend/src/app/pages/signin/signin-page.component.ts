@@ -66,7 +66,8 @@ export class SignInPageComponent {
 
     try {
       await this.authService.signIn(this.identifier.trim().toLowerCase(), this.password);
-      await this.router.navigateByUrl(this.authService.isAdmin() ? "/admin" : "/dashboard");
+      const resolvedRole = await this.authService.ensureRoleFromSession();
+      await this.router.navigateByUrl(resolvedRole === "admin" ? "/admin" : "/dashboard");
     } catch (error) {
       this.authError = this.authService.getSignInErrorMessage(error);
     } finally {
