@@ -55,6 +55,10 @@
   color: #b91c1c;
 }
 
+.status-card-success {
+  color: #157347;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -169,6 +173,11 @@ th {
   cursor: pointer;
 }
 
+.empty-cell {
+  color: #6b7687;
+  font-style: italic;
+}
+
 .summary-list {
   display: grid;
   gap: 10px;
@@ -239,12 +248,14 @@ th {
 
 .report-pill {
   display: inline-flex;
+  border: none;
   border-radius: 8px;
   background: #22c55e;
   color: #ffffff;
   font-size: 0.8rem;
   font-weight: 700;
   padding: 6px 12px;
+  cursor: pointer;
 }
 
 .actions-row {
@@ -273,6 +284,107 @@ th {
 
 .action-danger {
   background: #ef4444;
+}
+
+.action-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 23, 35, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 12px;
+}
+
+.modal-card {
+  width: min(540px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
+}
+
+.modal-card-large {
+  width: min(720px, 100%);
+}
+
+.modal-card h3 {
+  margin: 0 0 12px;
+  color: #1a273e;
+}
+
+.modal-card label {
+  display: block;
+  margin: 10px 0 5px;
+  color: #43516a;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.modal-card input,
+.modal-card select {
+  width: 100%;
+  border: 1px solid #ced6e4;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.95rem;
+}
+
+.form-hint {
+  margin: 10px 0 0;
+  color: #b36a00;
+  font-size: 0.84rem;
+}
+
+.modal-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modal-btn-primary {
+  background: #2d69f6;
+  color: #ffffff;
+}
+
+.modal-btn-muted {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.modal-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.report-detail-list {
+  margin-top: 12px;
+}
+
+.question-card {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #dde3ee;
+  border-radius: 8px;
+  background: #f8f9fc;
 }
 
 @media (max-width: 1260px) {

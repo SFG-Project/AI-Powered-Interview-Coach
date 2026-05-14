@@ -15,7 +15,16 @@
     </header>
 
     <article class="status-card status-card-error" *ngIf="state === 'error'">
-      Could not load live admin data. Showing fallback dashboard values.
+      Could not load live admin data right now.
+    </article>
+    <article class="status-card" *ngIf="state === 'loading'">Loading admin dashboard...</article>
+
+    <article class="status-card status-card-error" *ngIf="actionErrorMessage">
+      {{ actionErrorMessage }}
+    </article>
+
+    <article class="status-card status-card-success" *ngIf="actionSuccessMessage">
+      {{ actionSuccessMessage }}
     </article>
 
     <section class="summary-grid" aria-label="Admin summary">
@@ -41,12 +50,19 @@
                 </tr>
               </thead>
               <tbody>
+                <tr *ngIf="dashboard.recentUsers.length === 0">
+                  <td class="empty-cell" colspan="5">No recent users available.</td>
+                </tr>
                 <tr *ngFor="let row of dashboard.recentUsers">
                   <td>{{ row.name }}</td>
                   <td>{{ row.email }}</td>
                   <td>{{ row.role }}</td>
                   <td><span [class]="getStatusClass(row)">{{ row.status }}</span></td>
-                  <td><button type="button" class="table-action">{{ row.action }}</button></td>
+                  <td>
+                    <button type="button" class="table-action" (click)="onViewUser(row)">
+                      {{ row.action }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -67,12 +83,19 @@
                 </tr>
               </thead>
               <tbody>
+                <tr *ngIf="dashboard.recentInterviewReports.length === 0">
+                  <td class="empty-cell" colspan="5">No recent interview reports available.</td>
+                </tr>
                 <tr *ngFor="let row of dashboard.recentInterviewReports">
-                  <td>{{ row.date }}</td>
+                  <td>{{ row.date || 'N/A' }}</td>
                   <td>{{ row.user }}</td>
                   <td>{{ row.interviewType }}</td>
                   <td>{{ row.score }}</td>
-                  <td><span class="report-pill">{{ row.report }}</span></td>
+                  <td>
+                    <button type="button" class="report-pill" (click)="onOpenReport(row)">
+                      {{ row.report }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -108,6 +131,9 @@
               type="button"
               *ngFor="let action of dashboard.adminActions"
               [class]="getActionClass(action)"
+              [class.action-disabled]="!isActionEnabled(action)"
+              [disabled]="!isActionEnabled(action)"
+              [title]="action.hint || ''"
               (click)="onAdminAction(action)"
             >
               {{ action.label }}
@@ -118,3 +144,113 @@
     </section>
   </section>
 </main>
+
+<div class="modal-backdrop" *ngIf="isAddUserDialogOpen">
+  <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-user-title">
+    <h3 id="add-user-title">Add User</h3>
+
+    <form [formGroup]="addUserForm" (ngSubmit)="submitAddUser()" novalidate>
+      <label for="admin-add-first-name">First Name</label>
+      <input id="admin-add-first-name" type="text" formControlName="firstName" />
+
+      <label for="admin-add-last-name">Last Name</label>
+      <input id="admin-add-last-name" type="text" formControlName="lastName" />
+
+      <label for="admin-add-email">Email</label>
+      <input id="admin-add-email" type="email" formControlName="email" />
+
+      <label for="admin-add-password">Password</label>
+      <input id="admin-add-password" type="password" formControlName="password" />
+
+      <label for="admin-add-career-field">Career Field</label>
+      <select id="admin-add-career-field" formControlName="careerField">
+        <option *ngFor="let field of careerFieldOptions" [value]="field">{{ field }}</option>
+      </select>
+
+      <label for="admin-add-role">Role</label>
+      <select id="admin-add-role" formControlName="role">
+        <option *ngFor="let option of roleOptions" [value]="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+
+      <label for="admin-add-status">Status</label>
+      <select id="admin-add-status" formControlName="status">
+        <option *ngFor="let option of statusOptions" [value]="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+
+      <p class="form-hint" *ngIf="addUserForm.controls.password.invalid && addUserForm.controls.password.touched">
+        Password must be at least 8 characters and include letters and numbers.
+      </p>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-muted" (click)="closeAddUserDialog()" [disabled]="isSubmittingAddUser">
+          Cancel
+        </button>
+        <button type="submit" class="modal-btn modal-btn-primary" [disabled]="isSubmittingAddUser">
+          {{ isSubmittingAddUser ? "Creating..." : "Create User" }}
+        </button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<div class="modal-backdrop" *ngIf="isUserDetailDialogOpen">
+  <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="user-detail-title">
+    <h3 id="user-detail-title">User Details</h3>
+
+    <ng-container *ngIf="selectedUser as user">
+      <p><strong>Name:</strong> {{ user.name }}</p>
+      <p><strong>Email:</strong> {{ user.email }}</p>
+      <p><strong>Role:</strong> {{ user.role }}</p>
+      <p><strong>Status:</strong> {{ user.status }}</p>
+    </ng-container>
+
+    <div class="modal-actions">
+      <button type="button" class="modal-btn modal-btn-primary" (click)="closeUserDetailDialog()">
+        Close
+      </button>
+    </div>
+  </section>
+</div>
+
+<div class="modal-backdrop" *ngIf="isReportDetailDialogOpen">
+  <section class="modal-card modal-card-large" role="dialog" aria-modal="true" aria-labelledby="report-detail-title">
+    <h3 id="report-detail-title">Interview Report</h3>
+
+    <article class="status-card" *ngIf="isLoadingReportDetail">Loading report details...</article>
+    <article class="status-card status-card-error" *ngIf="!isLoadingReportDetail && reportDetailErrorMessage">
+      {{ reportDetailErrorMessage }}
+    </article>
+
+    <ng-container *ngIf="!isLoadingReportDetail && selectedReport as report">
+      <p><strong>User:</strong> {{ report.user.name }} ({{ report.user.email || 'No email' }})</p>
+      <p><strong>Interview Type:</strong> {{ report.interviewType }}</p>
+      <p><strong>Career Field:</strong> {{ report.careerField }}</p>
+      <p><strong>Difficulty:</strong> {{ report.difficulty }}</p>
+      <p><strong>Status:</strong> {{ report.status }}</p>
+      <p><strong>Completed:</strong> {{ formatCompletedAt(report.completedAt) }}</p>
+      <p><strong>Score:</strong> {{ report.score | number: '1.0-1' }}/{{ report.maxScore }}</p>
+      <p><strong>Summary:</strong> {{ report.summary }}</p>
+
+      <details class="report-detail-list" *ngIf="report.questions.length > 0">
+        <summary>Question Details</summary>
+
+        <article class="question-card" *ngFor="let question of report.questions">
+          <p><strong>Question {{ question.number }}:</strong> {{ question.question }}</p>
+          <p><strong>Answer:</strong> {{ question.answer }}</p>
+          <p><strong>Score:</strong> {{ question.score | number: '1.0-1' }}/10</p>
+          <p><strong>Feedback:</strong> {{ question.feedbackSummary }}</p>
+        </article>
+      </details>
+    </ng-container>
+
+    <div class="modal-actions">
+      <button type="button" class="modal-btn modal-btn-primary" (click)="closeReportDetailDialog()">
+        Close
+      </button>
+    </div>
+  </section>
+</div>

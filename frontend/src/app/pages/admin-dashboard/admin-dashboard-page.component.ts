@@ -1,104 +1,142 @@
 import { CommonModule } from "@angular/common";
+import { HttpErrorResponse } from "@angular/common/http";
 import { Component, OnInit, inject } from "@angular/core";
+import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { environment } from "../../../environments/environment";
 import {
   AdminActionItem,
+  AdminCreateUserPayload,
   AdminDashboardResponse,
   AdminDashboardService,
   AdminPerformanceRow,
   AdminRecentUserRow,
+  AdminReportDetailResponse,
+  AdminReportRow,
   AdminSystemSummaryRow,
+  AdminUserRole,
+  AdminUserStatus,
 } from "../../core/services/admin-dashboard.service";
 import { SidebarComponent } from "../../shared/components/sidebar/sidebar.component";
 
 type AdminDashboardState = "loading" | "ready" | "error";
 
-const FALLBACK_ADMIN_DASHBOARD: AdminDashboardResponse = {
-  summaryCards: [
-    { label: "Total Users", value: "148" },
-    { label: "Total Interviews", value: "520" },
-    { label: "Average Score", value: "7.4 / 10" },
-    { label: "Active Today", value: "36" },
-  ],
-  recentUsers: [
-    {
-      name: "Rorisang Sekoamane",
-      email: "rorisang@example.com",
-      role: "Software Developer",
-      status: "Active",
-      action: "View",
-    },
-    {
-      name: "Thabo Mokoena",
-      email: "thabo@example.com",
-      role: "IT Support",
-      status: "Pending",
-      action: "View",
-    },
-    {
-      name: "Lerato Nkosi",
-      email: "lerato@example.com",
-      role: "Data Analyst",
-      status: "Blocked",
-      action: "View",
-    },
-  ],
-  systemSummary: [
-    { label: "Active Users", value: "112", tone: "active" },
-    { label: "Pending Users", value: "24", tone: "pending" },
-    { label: "Blocked Users", value: "12", tone: "blocked" },
-  ],
-  performanceOverview: [
-    { label: "Technical Interviews", percentage: 82 },
-    { label: "Behavioral Interviews", percentage: 68 },
-    { label: "Mixed Interviews", percentage: 74 },
-  ],
-  recentInterviewReports: [
-    {
-      date: "06 May 2026",
-      user: "Rorisang",
-      interviewType: "Technical",
-      score: "8/10",
-      report: "Open",
-    },
-    {
-      date: "05 May 2026",
-      user: "Thabo",
-      interviewType: "Behavioral",
-      score: "7/10",
-      report: "Open",
-    },
-    {
-      date: "04 May 2026",
-      user: "Lerato",
-      interviewType: "Mixed",
-      score: "6/10",
-      report: "Open",
-    },
-  ],
-  adminActions: [
-    { label: "Add User", action: "add-user", tone: "primary" },
-    { label: "Export Reports", action: "export-reports", tone: "warning" },
-    { label: "Clear Logs", action: "clear-logs", tone: "danger" },
-  ],
-  adminUser: {
-    name: "Admin",
-    avatarText: "A",
+const DEFAULT_SUMMARY_CARDS = [
+  { label: "Total Users", value: "0" },
+  { label: "Total Interviews", value: "0" },
+  { label: "Average Score", value: "0.0 / 10" },
+  { label: "Active Today", value: "0" },
+];
+
+const DEFAULT_SYSTEM_SUMMARY = [
+  { label: "Active Users", value: "0", tone: "active" as const },
+  { label: "Pending Users", value: "0", tone: "pending" as const },
+  { label: "Blocked Users", value: "0", tone: "blocked" as const },
+];
+
+const DEFAULT_PERFORMANCE_OVERVIEW = [
+  { label: "Technical Interviews", percentage: 0 },
+  { label: "Behavioral Interviews", percentage: 0 },
+  { label: "Mixed Interviews", percentage: 0 },
+];
+
+const DEFAULT_ADMIN_ACTIONS: AdminActionItem[] = [
+  { label: "Add User", action: "add-user", tone: "primary", enabled: true },
+  {
+    label: "Export Reports",
+    action: "export-reports",
+    tone: "warning",
+    enabled: true,
   },
-};
+  {
+    label: "Clear Logs",
+    action: "clear-logs",
+    tone: "danger",
+    enabled: false,
+    hint: "Log storage is not configured yet in this project.",
+  },
+];
+
+const CAREER_FIELD_OPTIONS = [
+  "Software Developer",
+  "Data Analyst",
+  "Business Analyst",
+  "Project Manager",
+  "Cybersecurity Analyst",
+  "Other",
+];
+
+function buildEmptyAdminDashboard(): AdminDashboardResponse {
+  return {
+    summaryCards: DEFAULT_SUMMARY_CARDS,
+    recentUsers: [],
+    systemSummary: DEFAULT_SYSTEM_SUMMARY,
+    performanceOverview: DEFAULT_PERFORMANCE_OVERVIEW,
+    recentInterviewReports: [],
+    adminActions: DEFAULT_ADMIN_ACTIONS,
+    adminUser: {
+      name: "Admin",
+      avatarText: "A",
+    },
+  };
+}
 
 @Component({
   selector: "app-admin-dashboard-page",
   standalone: true,
-  imports: [CommonModule, SidebarComponent],
+  imports: [CommonModule, ReactiveFormsModule, SidebarComponent],
   templateUrl: "./admin-dashboard-page.component.html",
   styleUrls: ["./admin-dashboard-page.component.css"],
 })
 export class AdminDashboardPageComponent implements OnInit {
   private readonly adminDashboardService = inject(AdminDashboardService);
+  private readonly formBuilder = inject(FormBuilder);
 
   state: AdminDashboardState = "loading";
-  dashboard: AdminDashboardResponse = FALLBACK_ADMIN_DASHBOARD;
+  dashboard: AdminDashboardResponse = buildEmptyAdminDashboard();
+
+  actionErrorMessage = "";
+  actionSuccessMessage = "";
+
+  isSubmittingAddUser = false;
+  isExportingReports = false;
+  isClearingLogs = false;
+
+  isAddUserDialogOpen = false;
+  isUserDetailDialogOpen = false;
+  isReportDetailDialogOpen = false;
+  isLoadingReportDetail = false;
+
+  selectedUser: AdminRecentUserRow | null = null;
+  selectedReport: AdminReportDetailResponse | null = null;
+  reportDetailErrorMessage = "";
+
+  readonly careerFieldOptions = CAREER_FIELD_OPTIONS;
+  readonly roleOptions: { label: string; value: AdminUserRole }[] = [
+    { label: "User", value: "user" },
+    { label: "Admin", value: "admin" },
+  ];
+  readonly statusOptions: { label: string; value: AdminUserStatus }[] = [
+    { label: "Active", value: "active" },
+    { label: "Pending", value: "pending" },
+    { label: "Blocked", value: "blocked" },
+  ];
+
+  readonly addUserForm = this.formBuilder.nonNullable.group({
+    firstName: ["", [Validators.required]],
+    lastName: ["", [Validators.required]],
+    email: ["", [Validators.required, Validators.email]],
+    password: [
+      "",
+      [Validators.required, Validators.minLength(8), Validators.pattern(/^(?=.*[A-Za-z])(?=.*\d).+$/)],
+    ],
+    careerField: ["Software Developer", [Validators.required]],
+    role: ["user" as AdminUserRole, [Validators.required]],
+    status: ["active" as AdminUserStatus, [Validators.required]],
+  });
+
+  get isActionBusy(): boolean {
+    return this.isSubmittingAddUser || this.isExportingReports || this.isClearingLogs;
+  }
 
   ngOnInit(): void {
     void this.loadDashboard();
@@ -106,16 +144,14 @@ export class AdminDashboardPageComponent implements OnInit {
 
   async loadDashboard(): Promise<void> {
     this.state = "loading";
-    this.logDashboardLoad("start");
 
     try {
-      this.dashboard = await this.adminDashboardService.getDashboard();
+      const payload = await this.adminDashboardService.getDashboard();
+      this.dashboard = this.normalizeDashboardPayload(payload);
       this.state = "ready";
-      this.logDashboardLoad("success");
     } catch (error) {
+      this.dashboard = buildEmptyAdminDashboard();
       this.state = "error";
-      this.dashboard = FALLBACK_ADMIN_DASHBOARD;
-      this.logDashboardLoad("fallback");
       if (!environment.production) {
         console.error("[admin/dashboard] Failed to load admin dashboard data.", error);
       }
@@ -160,25 +196,257 @@ export class AdminDashboardPageComponent implements OnInit {
     return "action-btn action-danger";
   }
 
-  onAdminAction(action: AdminActionItem): void {
-    if (!environment.production) {
-      console.info(`[admin/actions] Triggered action: ${action.action}`);
+  isActionEnabled(action: AdminActionItem): boolean {
+    if (action.enabled === false) {
+      return false;
     }
+
+    return !this.isActionBusy;
   }
 
-  private logDashboardLoad(stage: "start" | "success" | "fallback"): void {
-    if (environment.production) {
+  async onAdminAction(action: AdminActionItem): Promise<void> {
+    this.actionErrorMessage = "";
+    this.actionSuccessMessage = "";
+
+    if (action.enabled === false) {
+      this.actionErrorMessage = action.hint || "This action is not available yet.";
       return;
     }
 
-    console.info("[admin/dashboard] Load state.", {
-      stage,
-      summaryCards: this.dashboard.summaryCards.length,
-      recentUsers: this.dashboard.recentUsers.length,
-      recentInterviewReports: this.dashboard.recentInterviewReports.length,
-      systemSummary: this.dashboard.systemSummary.length,
-      performanceOverview: this.dashboard.performanceOverview.length,
-      adminActions: this.dashboard.adminActions.length,
+    if (action.action === "add-user") {
+      this.openAddUserDialog();
+      return;
+    }
+
+    if (action.action === "export-reports") {
+      await this.exportReports();
+      return;
+    }
+
+    if (action.action === "clear-logs") {
+      await this.clearLogs();
+      return;
+    }
+
+    if (!environment.production) {
+      console.info(`[admin/actions] Unknown action: ${action.action}`);
+    }
+  }
+
+  openAddUserDialog(): void {
+    this.addUserForm.reset({
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      careerField: "Software Developer",
+      role: "user",
+      status: "active",
     });
+    this.isAddUserDialogOpen = true;
+  }
+
+  closeAddUserDialog(): void {
+    if (this.isSubmittingAddUser) {
+      return;
+    }
+
+    this.isAddUserDialogOpen = false;
+  }
+
+  async submitAddUser(): Promise<void> {
+    this.actionErrorMessage = "";
+    this.actionSuccessMessage = "";
+
+    if (this.addUserForm.invalid) {
+      this.addUserForm.markAllAsTouched();
+      return;
+    }
+
+    this.isSubmittingAddUser = true;
+
+    try {
+      const form = this.addUserForm.getRawValue();
+      const payload: AdminCreateUserPayload = {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        careerField: form.careerField,
+        role: form.role,
+        status: form.status,
+      };
+
+      const response = await this.adminDashboardService.createUser(payload);
+      this.isAddUserDialogOpen = false;
+      this.actionSuccessMessage = `User ${response.user.name} created successfully.`;
+      await this.loadDashboard();
+    } catch (error) {
+      this.actionErrorMessage = this.toErrorMessage(error, "Failed to create user.");
+    } finally {
+      this.isSubmittingAddUser = false;
+    }
+  }
+
+  onViewUser(row: AdminRecentUserRow): void {
+    this.selectedUser = row;
+    this.isUserDetailDialogOpen = true;
+  }
+
+  closeUserDetailDialog(): void {
+    this.selectedUser = null;
+    this.isUserDetailDialogOpen = false;
+  }
+
+  async onOpenReport(row: AdminReportRow): Promise<void> {
+    this.reportDetailErrorMessage = "";
+    this.selectedReport = null;
+    this.isReportDetailDialogOpen = true;
+    this.isLoadingReportDetail = true;
+
+    try {
+      if (!row.sessionId) {
+        this.reportDetailErrorMessage =
+          "Report detail endpoint requires a session id. This row cannot be opened yet.";
+        return;
+      }
+
+      this.selectedReport = await this.adminDashboardService.getReportDetail(row.sessionId);
+    } catch (error) {
+      this.reportDetailErrorMessage = this.toErrorMessage(
+        error,
+        "Failed to load report details."
+      );
+    } finally {
+      this.isLoadingReportDetail = false;
+    }
+  }
+
+  closeReportDetailDialog(): void {
+    this.isReportDetailDialogOpen = false;
+    this.isLoadingReportDetail = false;
+    this.selectedReport = null;
+    this.reportDetailErrorMessage = "";
+  }
+
+  async exportReports(): Promise<void> {
+    this.isExportingReports = true;
+
+    try {
+      const blob = await this.adminDashboardService.exportReportsCsv();
+      const dateLabel = new Date().toISOString().slice(0, 10);
+      this.downloadBlob(blob, `admin-reports-${dateLabel}.csv`);
+      this.actionSuccessMessage = "Reports exported successfully.";
+    } catch (error) {
+      this.actionErrorMessage = this.toErrorMessage(error, "Failed to export reports.");
+    } finally {
+      this.isExportingReports = false;
+    }
+  }
+
+  async clearLogs(): Promise<void> {
+    this.isClearingLogs = true;
+
+    try {
+      const response = await this.adminDashboardService.clearLogs();
+      if (response.cleared) {
+        this.actionSuccessMessage = response.message;
+      } else {
+        this.actionErrorMessage = response.message;
+      }
+    } catch (error) {
+      this.actionErrorMessage = this.toErrorMessage(error, "Failed to clear logs.");
+    } finally {
+      this.isClearingLogs = false;
+    }
+  }
+
+  formatCompletedAt(value: string | null | undefined): string {
+    if (!value) {
+      return "N/A";
+    }
+
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) {
+      return "N/A";
+    }
+
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(new Date(parsed));
+  }
+
+  private normalizeDashboardPayload(payload: AdminDashboardResponse): AdminDashboardResponse {
+    return {
+      summaryCards:
+        Array.isArray(payload?.summaryCards) && payload.summaryCards.length
+          ? payload.summaryCards
+          : DEFAULT_SUMMARY_CARDS,
+      recentUsers: Array.isArray(payload?.recentUsers) ? payload.recentUsers : [],
+      systemSummary:
+        Array.isArray(payload?.systemSummary) && payload.systemSummary.length
+          ? payload.systemSummary
+          : DEFAULT_SYSTEM_SUMMARY,
+      performanceOverview:
+        Array.isArray(payload?.performanceOverview) && payload.performanceOverview.length
+          ? payload.performanceOverview
+          : DEFAULT_PERFORMANCE_OVERVIEW,
+      recentInterviewReports: Array.isArray(payload?.recentInterviewReports)
+        ? payload.recentInterviewReports
+        : [],
+      adminActions:
+        Array.isArray(payload?.adminActions) && payload.adminActions.length
+          ? payload.adminActions
+          : DEFAULT_ADMIN_ACTIONS,
+      adminUser: {
+        name:
+          typeof payload?.adminUser?.name === "string" && payload.adminUser.name.trim()
+            ? payload.adminUser.name.trim()
+            : "Admin",
+        avatarText:
+          typeof payload?.adminUser?.avatarText === "string" &&
+          payload.adminUser.avatarText.trim()
+            ? payload.adminUser.avatarText.trim()
+            : "A",
+      },
+    };
+  }
+
+  private toErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (error instanceof HttpErrorResponse) {
+      if (
+        error.error &&
+        typeof error.error === "object" &&
+        typeof (error.error as { message?: unknown }).message === "string"
+      ) {
+        return (error.error as { message: string }).message;
+      }
+
+      if (typeof error.message === "string" && error.message.trim()) {
+        return error.message;
+      }
+    }
+
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    return fallbackMessage;
+  }
+
+  private downloadBlob(blob: Blob, fileName: string): void {
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
   }
 }

@@ -9,6 +9,7 @@ const {
 } = require("./config/firebaseAdmin");
 const { interviewRoutes } = require("./routes/interviewRoutes");
 const { createDashboardRoutes } = require("./routes/dashboardRoutes");
+const { createAdminRoutes } = require("./routes/adminRoutes");
 const { getProgressForUser } = require("./services/progressService");
 const { getFeedbackReportsForUser } = require("./services/feedbackReportsService");
 
@@ -61,6 +62,10 @@ void seedDefaultAdminUser();
 logMissingCriticalEnvironmentVariables();
 app.use("/api/interview", interviewRoutes);
 app.use("/api/dashboard", createDashboardRoutes({ requireAuthenticatedUser }));
+app.use(
+  "/api/admin",
+  createAdminRoutes({ requireAuthenticatedUser, requireAdminUser })
+);
 
 app.get("/api/health", (_req, res) => {
   res.json({ message: "Backend is running" });
@@ -124,10 +129,13 @@ app.post("/api/auth/signup", async (req, res) => {
           uid: createdUser.uid,
           firstName,
           lastName,
+          fullName: displayName,
           displayName,
           email,
           industry,
+          careerField: industry,
           role: USER_ROLE_USER,
+          status: "active",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
@@ -490,10 +498,6 @@ app.get("/api/feedback-reports/me", requireAuthenticatedUser, async (req, res) =
   }
 });
 
-app.get("/api/admin/dashboard", requireAuthenticatedUser, requireAdminUser, (_req, res) => {
-  res.status(200).json(buildAdminDashboardPayload());
-});
-
 app.get("/api/firestore/health", async (req, res) => {
   const origin = getTrimmedString(req.headers.origin) || "unknown-origin";
   console.info(`[firestore/health] GET hit from ${origin}.`);
@@ -722,6 +726,7 @@ async function ensureUserSettingsDocument(firestore, authUser) {
     await docRef.set({
       uid: authUser.uid,
       role: normalizeUserRole(authUser.role),
+      status: "active",
       email: defaults.email,
       fullName: defaults.fullName,
       careerField: defaults.careerField,
@@ -752,6 +757,10 @@ async function ensureUserSettingsDocument(firestore, authUser) {
 
   if (typeof data.email !== "string" || !data.email.trim()) {
     patch.email = normalizedValues.email;
+  }
+
+  if (typeof data.status !== "string" || !data.status.trim()) {
+    patch.status = "active";
   }
 
   if (typeof data.fullName !== "string" || !data.fullName.trim()) {
@@ -1403,7 +1412,9 @@ async function seedDefaultAdminUser() {
           displayName: DEFAULT_ADMIN_DISPLAY_NAME,
           email: adminEmail,
           industry: "Software Developer",
+          careerField: "Software Developer",
           role: USER_ROLE_ADMIN,
+          status: "active",
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -1436,82 +1447,6 @@ function getAdminSeedPassword() {
   return getTrimmedString(process.env.ADMIN_SEED_PASSWORD) || DEFAULT_ADMIN_PASSWORD;
 }
 
-function buildAdminDashboardPayload() {
-  return {
-    summaryCards: [
-      { label: "Total Users", value: "148" },
-      { label: "Total Interviews", value: "520" },
-      { label: "Average Score", value: "7.4 / 10" },
-      { label: "Active Today", value: "36" },
-    ],
-    recentUsers: [
-      {
-        name: "Rorisang Sekoamane",
-        email: "rorisang@example.com",
-        role: "Software Developer",
-        status: "Active",
-        action: "View",
-      },
-      {
-        name: "Thabo Mokoena",
-        email: "thabo@example.com",
-        role: "IT Support",
-        status: "Pending",
-        action: "View",
-      },
-      {
-        name: "Lerato Nkosi",
-        email: "lerato@example.com",
-        role: "Data Analyst",
-        status: "Blocked",
-        action: "View",
-      },
-    ],
-    systemSummary: [
-      { label: "Active Users", value: "112", tone: "active" },
-      { label: "Pending Users", value: "24", tone: "pending" },
-      { label: "Blocked Users", value: "12", tone: "blocked" },
-    ],
-    performanceOverview: [
-      { label: "Technical Interviews", percentage: 82 },
-      { label: "Behavioral Interviews", percentage: 68 },
-      { label: "Mixed Interviews", percentage: 74 },
-    ],
-    recentInterviewReports: [
-      {
-        date: "06 May 2026",
-        user: "Rorisang",
-        interviewType: "Technical",
-        score: "8/10",
-        report: "Open",
-      },
-      {
-        date: "05 May 2026",
-        user: "Thabo",
-        interviewType: "Behavioral",
-        score: "7/10",
-        report: "Open",
-      },
-      {
-        date: "04 May 2026",
-        user: "Lerato",
-        interviewType: "Mixed",
-        score: "6/10",
-        report: "Open",
-      },
-    ],
-    adminActions: [
-      { label: "Add User", action: "add-user", tone: "primary" },
-      { label: "Export Reports", action: "export-reports", tone: "warning" },
-      { label: "Clear Logs", action: "clear-logs", tone: "danger" },
-    ],
-    adminUser: {
-      name: "Admin",
-      avatarText: "A",
-    },
-  };
-}
-
 function logSignInFailure({ email, normalizedErrorCode, providerErrorCode, details }) {
   const detailText = details ? ` details="${details}"` : "";
   const providerCodeText = providerErrorCode
@@ -1526,7 +1461,7 @@ function logSignInFailure({ email, normalizedErrorCode, providerErrorCode, detai
 
 function logAuthRouteRegistration() {
   console.info(
-    "[startup] Registered auth routes: POST /api/auth/signup, POST /api/auth/signin, GET /api/auth/session. Admin route: GET /api/admin/dashboard."
+    "[startup] Registered auth routes: POST /api/auth/signup, POST /api/auth/signin, GET /api/auth/session. Admin routes mounted at /api/admin."
   );
 }
 
