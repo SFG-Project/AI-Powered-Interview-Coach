@@ -1,0 +1,36 @@
+<section class="summary-grid" aria-hidden="true">
+  <article class="summary-card" *ngFor="let _ of summaryPlaceholders">
+    <span class="skeleton skeleton-line short"></span>
+    <span class="skeleton skeleton-line large"></span>
+  </article>
+</section>
+
+<section class="welcome-card" aria-hidden="true">
+  <span class="skeleton skeleton-line medium"></span>
+  <span class="skeleton skeleton-line full"></span>
+  <span class="skeleton skeleton-line full"></span>
+
+  <div class="action-row">
+    <span class="skeleton skeleton-pill"></span>
+    <span class="skeleton skeleton-pill"></span>
+    <span class="skeleton skeleton-pill"></span>
+  </div>
+</section>
+
+<section class="table-card" aria-hidden="true">
+  <span class="skeleton skeleton-line medium"></span>
+
+  <div class="table-head">
+    <span class="skeleton skeleton-line"></span>
+    <span class="skeleton skeleton-line"></span>
+    <span class="skeleton skeleton-line"></span>
+    <span class="skeleton skeleton-line"></span>
+  </div>
+
+  <div class="table-row" *ngFor="let _ of rowPlaceholders">
+    <span class="skeleton skeleton-line"></span>
+    <span class="skeleton skeleton-line"></span>
+    <span class="skeleton skeleton-line"></span>
+    <span class="skeleton skeleton-line"></span>
+  </div>
+</section>

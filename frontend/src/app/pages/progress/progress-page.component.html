@@ -1,0 +1,89 @@
+<main class="progress-page">
+  <app-sidebar [activeItem]="'progress'"></app-sidebar>
+
+  <section class="progress-content">
+    <h1>Progress</h1>
+
+    <article class="overview-card">
+      <h2>Performance Overview</h2>
+      <p>Track your growth across different interview skills.</p>
+    </article>
+
+    <article class="status-card" *ngIf="state === 'loading'">
+      <app-loader label="Loading progress..." [centered]="false"></app-loader>
+    </article>
+
+    <article class="status-card status-card-error" *ngIf="state === 'error'">
+      Could not load progress right now.
+    </article>
+
+    <section class="summary-grid" *ngIf="state === 'ready' || state === 'empty'">
+      <article class="summary-card">
+        <span>Total Interviews</span>
+        <strong>{{ overview.totalInterviews }}</strong>
+      </article>
+
+      <article class="summary-card">
+        <span>Completed</span>
+        <strong>{{ overview.completedInterviews }}</strong>
+      </article>
+
+      <article class="summary-card">
+        <span>Average Score</span>
+        <strong>{{ overview.averageScore | number: '1.0-1' }}/10</strong>
+      </article>
+
+      <article class="summary-card">
+        <span>Best Score</span>
+        <strong>{{ overview.bestScore | number: '1.0-1' }}/10</strong>
+      </article>
+
+      <article class="summary-card">
+        <span>Latest Score</span>
+        <strong>{{ overview.latestScore | number: '1.0-1' }}/10</strong>
+      </article>
+    </section>
+
+    <section class="progress-grid" *ngIf="state === 'ready' || state === 'empty'">
+      <article class="panel skill-panel">
+        <h2>Skill Improvement</h2>
+
+        <div class="skill-list">
+          <div class="skill-row" *ngFor="let skill of skills">
+            <p class="skill-name">{{ skill.name }}</p>
+
+            <div
+              class="skill-track"
+              role="progressbar"
+              [attr.aria-label]="skill.name"
+              [attr.aria-valuenow]="skill.percentage"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <span class="skill-fill" [style.width.%]="skill.percentage"></span>
+            </div>
+
+            <span class="skill-badge">{{ skill.percentage }}%</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel score-panel">
+        <h2>Interview Scores</h2>
+
+        <p class="empty-copy" *ngIf="state === 'empty'">
+          No completed interviews yet. Complete an interview session to see your progress.
+        </p>
+
+        <div class="score-list" *ngIf="visibleInterviewScores.length > 0">
+          <article class="score-row" *ngFor="let interview of visibleInterviewScores">
+            <span class="score-label">{{ interview.label }}</span>
+            <span class="score-pill">
+              {{ interview.score | number: '1.0-1' }}/{{ interview.maxScore | number: '1.0-0' }}
+            </span>
+          </article>
+        </div>
+      </article>
+    </section>
+  </section>
+</main>

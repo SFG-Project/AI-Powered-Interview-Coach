@@ -1,0 +1,69 @@
+<main class="auth-page">
+  <section class="auth-shell">
+    <aside class="auth-side">
+      <p class="eyebrow">Welcome Back</p>
+      <h1>Don&rsquo;t have an Account?</h1>
+      <p>
+        Build confidence with role-focused interview practice and tailored
+        coaching feedback.
+      </p>
+      <a class="side-link" routerLink="/signup">Create account</a>
+    </aside>
+
+    <section class="auth-form-panel">
+      <h2>Sign in</h2>
+      <p class="form-note">Access your interview dashboard and progress.</p>
+
+      <p class="success-message" *ngIf="successMessage">{{ successMessage }}</p>
+
+      <div class="error-box" *ngIf="validationErrors.length || authError">
+        <p *ngFor="let error of validationErrors">{{ error }}</p>
+        <p *ngIf="authError">{{ authError }}</p>
+      </div>
+
+      <form novalidate (submit)="onSubmit($event)">
+        <label for="signin-identifier">Email or Username</label>
+        <input
+          id="signin-identifier"
+          type="text"
+          [value]="identifier"
+          (input)="onFieldInput('identifier', $event)"
+          autocomplete="username"
+        />
+
+        <label for="signin-password">Password</label>
+        <input
+          id="signin-password"
+          type="password"
+          [value]="password"
+          (input)="onFieldInput('password', $event)"
+          autocomplete="current-password"
+        />
+
+        <label class="terms">
+          <input
+            type="checkbox"
+            [checked]="acceptedTerms"
+            (change)="onTermsChange($event)"
+          />
+          <span>I agree to the terms and privacy policy.</span>
+        </label>
+
+        <button type="submit" [disabled]="isSubmitting">
+          {{ isSubmitting ? "Signing in..." : "Sign in" }}
+        </button>
+
+        <app-loader
+          *ngIf="isSubmitting"
+          label="Verifying your account..."
+          [centered]="false"
+        ></app-loader>
+      </form>
+
+      <p class="switch-text">
+        New here?
+        <a routerLink="/signup">Sign up</a>
+      </p>
+    </section>
+  </section>
+</main>

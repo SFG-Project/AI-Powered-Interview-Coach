@@ -1,22 +1,40 @@
 <main class="landing">
-  <section class="landing-card">
-    <p class="eyebrow">Assignment Starter</p>
-    <h1>{{ title }}</h1>
-    <p class="subtitle">{{ subtitle }}</p>
+  <section class="landing-shell">
+    <h1 class="app-title">AI INTERVIEW COACH</h1>
 
-    <div class="actions">
-      <button type="button" class="primary">Get Started</button>
-      <button type="button" class="secondary">Login</button>
-    </div>
+    <section class="hero">
+      <div class="hero-media" aria-hidden="true">
+        <img class="hero-img" src="assets/assets.png" alt="AI Interview Coach" />
+      </div>
 
-    <p class="firebase-note">
+      <div class="hero-content">
+        <h2>Align Your Career With the Job You Truly Want.</h2>
+        <p>
+          Practice interviews with adaptive coaching and build confidence for
+          the role you are targeting.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" routerLink="/signin">Sign-in</a>
+          <a class="btn btn-secondary" routerLink="/signup">Sign-up</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats" aria-label="Platform stats">
+      <article class="stat-card" *ngFor="let stat of stats">
+        <h3>{{ stat.value }}</h3>
+        <p>{{ stat.label }}</p>
+      </article>
+    </section>
+
+    <p class="status-note">
       {{
-        firebaseConfigured
-          ? "Firebase config detected."
-          : "Firebase config is missing."
+      backendApiConfigured
+      ? "Backend API URL configured."
+      : "Backend API URL is missing."
       }}
     </p>
-
-    <p class="firebase-note">{{ firestoreStatusMessage }}</p>
+    <p class="status-note">{{ firestoreStatusMessage }}</p>
   </section>
 </main>

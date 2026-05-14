@@ -1,0 +1,255 @@
+<main class="interview-page">
+  <app-sidebar [activeItem]="'interview-session'"></app-sidebar>
+
+  <section class="interview-content">
+    <header class="page-header">
+      <h1>Interview Session</h1>
+
+      <div class="user-chip">
+        <span class="avatar">{{ userInitial }}</span>
+        <span>{{ userName }}</span>
+      </div>
+    </header>
+
+    <section class="setup-card" *ngIf="!hasSession">
+      <h2>Interview Setup</h2>
+      <p class="setup-subtitle">
+        Choose your setup, then start a guided interview session.
+      </p>
+
+      <p class="state-message error" *ngIf="state === 'error' && errorMessage">
+        {{ errorMessage }}
+      </p>
+      <div class="state-message" *ngIf="state === 'loading'">
+        <app-loader label="Starting interview session..." [centered]="false"></app-loader>
+      </div>
+
+      <div class="setup-grid">
+        <label>
+          Career field
+          <select
+            [(ngModel)]="setupModel.careerField"
+            name="careerField"
+            [disabled]="state === 'loading'"
+          >
+            <option *ngFor="let option of careerFieldOptions" [ngValue]="option">
+              {{ option }}
+            </option>
+          </select>
+        </label>
+
+        <label>
+          Interview type
+          <select
+            [(ngModel)]="setupModel.interviewType"
+            name="interviewType"
+            [disabled]="state === 'loading'"
+          >
+            <option *ngFor="let option of interviewTypeOptions" [ngValue]="option">
+              {{ option }}
+            </option>
+          </select>
+        </label>
+
+        <label>
+          Difficulty
+          <select
+            [(ngModel)]="setupModel.difficulty"
+            name="difficulty"
+            [disabled]="state === 'loading'"
+          >
+            <option *ngFor="let option of difficultyOptions" [ngValue]="option">
+              {{ option }}
+            </option>
+          </select>
+        </label>
+
+        <label>
+          Number of questions
+          <select
+            [(ngModel)]="setupModel.questionCount"
+            name="questionCount"
+            [disabled]="state === 'loading'"
+          >
+            <option *ngFor="let count of questionCountOptions" [ngValue]="count">
+              {{ count }}
+            </option>
+          </select>
+        </label>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="startInterview()"
+        [disabled]="state === 'loading'"
+      >
+        Start Interview
+      </button>
+    </section>
+
+    <ng-container *ngIf="hasSession">
+      <section class="hero-card">
+        <h2>Technical Mock Interview</h2>
+        <p>
+          Stay calm, answer clearly, and use examples where possible. The AI
+          will evaluate your clarity, confidence, and technical depth.
+        </p>
+
+        <div class="hero-stats">
+          <article class="hero-stat">
+            <span>Role</span>
+            <strong>{{ setupModel.careerField }}</strong>
+          </article>
+
+          <article class="hero-stat">
+            <span>Question</span>
+            <strong>{{ currentQuestionNumber }} / {{ totalQuestions }}</strong>
+          </article>
+
+          <article class="hero-stat">
+            <span>Difficulty</span>
+            <strong>{{ setupModel.difficulty }}</strong>
+          </article>
+        </div>
+      </section>
+
+      <p class="state-message error" *ngIf="state === 'error' && errorMessage">
+        {{ errorMessage }}
+      </p>
+      <div class="state-message" *ngIf="state === 'loading'">
+        <app-loader label="Processing interview request..." [centered]="false"></app-loader>
+      </div>
+
+      <section class="workspace-grid">
+        <article class="panel live-interview">
+          <header class="panel-header">
+            <h3>Live Interview</h3>
+            <span class="timer-pill">{{ timerLabel }}</span>
+          </header>
+
+          <div class="progress-track">
+            <div class="progress-fill" [style.width.%]="progressPercentage"></div>
+          </div>
+
+          <section class="question-card">
+            <p>Current Question:</p>
+            <h4>{{ currentQuestion?.text || completionSummary || "Interview completed." }}</h4>
+          </section>
+
+          <section class="messages">
+            <article
+              *ngFor="let message of messages"
+              class="message-row"
+              [class.user]="message.sender === 'user'"
+            >
+              <p class="message-bubble">{{ message.content }}</p>
+            </article>
+
+            <p class="typing" *ngIf="state === 'aiTyping'">AI is typing...</p>
+          </section>
+
+          <section class="input-area">
+            <div class="input-row">
+              <button type="button" class="mic-btn" [disabled]="isBusy || state === 'completed'">
+                🎤
+              </button>
+
+              <input
+                type="text"
+                [value]="userAnswer"
+                (input)="onAnswerInput($event)"
+                (keyup.enter)="sendAnswer()"
+                placeholder="Type your answer here..."
+                [disabled]="isBusy || state === 'completed' || !currentQuestion"
+              />
+
+              <button
+                type="button"
+                class="btn btn-primary send-btn"
+                (click)="sendAnswer()"
+                [disabled]="isBusy || state === 'completed' || !currentQuestion || !userAnswer.trim()"
+              >
+                Send
+              </button>
+            </div>
+
+            <div class="action-row">
+              <button
+                type="button"
+                class="btn btn-warning"
+                (click)="togglePause()"
+                [disabled]="state !== 'active'"
+              >
+                {{ isPaused ? "Resume" : "Pause" }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-success"
+                (click)="nextQuestion()"
+                [disabled]="isBusy || state === 'completed' || !currentQuestion"
+              >
+                Next Question
+              </button>
+              <button
+                type="button"
+                class="btn btn-danger"
+                (click)="endInterview()"
+                [disabled]="isBusy || state === 'completed'"
+              >
+                End Interview
+              </button>
+            </div>
+
+            <div class="completion-row" *ngIf="state === 'completed'">
+              <p>{{ completionSummary || "Interview finished. You can start another session." }}</p>
+              <button type="button" class="btn btn-primary" (click)="resetToSetup()">
+                Start New Interview
+              </button>
+            </div>
+          </section>
+        </article>
+
+        <article class="panel evaluation-panel">
+          <h3>Live Evaluation</h3>
+
+          <section class="score-card">
+            <p>Current Score</p>
+            <div class="score-ring" [ngStyle]="scoreRingStyle">
+              <span>{{ scoreLabel }}</span>
+            </div>
+          </section>
+
+          <section class="metric-list">
+            <div class="metric-row">
+              <span>Clarity</span>
+              <span class="metric-badge">{{ evaluation.clarity }}</span>
+            </div>
+            <div class="metric-row">
+              <span>Technical Accuracy</span>
+              <span class="metric-badge">{{ evaluation.technicalAccuracy }}</span>
+            </div>
+            <div class="metric-row">
+              <span>Confidence</span>
+              <span class="metric-badge">{{ evaluation.confidence }}</span>
+            </div>
+            <div class="metric-row">
+              <span>Communication</span>
+              <span class="metric-badge">{{ evaluation.communication }}</span>
+            </div>
+          </section>
+
+          <section class="info-card">
+            <h4>Quick Tip</h4>
+            <p>{{ evaluation.quickTip }}</p>
+          </section>
+
+          <section class="info-card">
+            <h4>Session Notes</h4>
+            <p>{{ evaluation.sessionNotes }}</p>
+          </section>
+        </article>
+      </section>
+    </ng-container>
+  </section>
+</main>

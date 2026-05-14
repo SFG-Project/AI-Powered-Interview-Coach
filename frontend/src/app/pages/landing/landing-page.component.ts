@@ -1,26 +1,30 @@
+import { CommonModule } from "@angular/common";
 import { Component, OnInit, inject } from "@angular/core";
+import { RouterLink } from "@angular/router";
+import { environment } from "../../../environments/environment";
 import {
   FirestoreConnectionResult,
   FirestoreConnectionStatus,
   FirestoreHealthService,
 } from "../../core/services/firestore-health.service";
-import { environment } from "../../../environments/environment";
 
 @Component({
   selector: "app-landing-page",
   standalone: true,
+  imports: [CommonModule, RouterLink],
   templateUrl: "./landing-page.component.html",
   styleUrls: ["./landing-page.component.css"],
 })
 export class LandingPageComponent implements OnInit {
   private readonly firestoreHealthService = inject(FirestoreHealthService);
 
-  readonly title = "AI-Powered Adaptive Interview Coach";
-  readonly subtitle =
-    "A focused starter app for practicing interviews with adaptive coaching.";
-  readonly firebaseConfigured = Boolean(
-    environment.firebase.apiKey && environment.firebase.projectId
-  );
+  readonly stats = [
+    { value: "10,000+", label: "Interview Conducted" },
+    { value: "4.8/5", label: "Average User Rating" },
+    { value: "92%", label: "User Reported Improved Confidence" },
+    { value: "35+", label: "Industries Covered" },
+  ];
+  readonly backendApiConfigured = Boolean(environment.apiBaseUrl);
 
   firestoreStatus: FirestoreConnectionResult = { status: "idle" };
 

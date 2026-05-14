@@ -1,0 +1,120 @@
+<main class="admin-page">
+  <app-sidebar
+    [activeItem]="'admin-dashboard'"
+    [brandLabel]="'AI Coach Admin'"
+    [footerLabel]="'Admin Panel'"
+  ></app-sidebar>
+
+  <section class="admin-content">
+    <header class="admin-header">
+      <h1>Admin Dashboard</h1>
+      <div class="admin-user-chip">
+        <span class="admin-avatar">{{ dashboard.adminUser.avatarText }}</span>
+        <span>{{ dashboard.adminUser.name }}</span>
+      </div>
+    </header>
+
+    <article class="status-card status-card-error" *ngIf="state === 'error'">
+      Could not load live admin data. Showing fallback dashboard values.
+    </article>
+
+    <section class="summary-grid" aria-label="Admin summary">
+      <article class="summary-card" *ngFor="let card of dashboard.summaryCards">
+        <p class="summary-label">{{ card.label }}</p>
+        <p class="summary-value">{{ card.value }}</p>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <section class="left-column">
+        <article class="card">
+          <h2>Recent Users</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of dashboard.recentUsers">
+                  <td>{{ row.name }}</td>
+                  <td>{{ row.email }}</td>
+                  <td>{{ row.role }}</td>
+                  <td><span [class]="getStatusClass(row)">{{ row.status }}</span></td>
+                  <td><button type="button" class="table-action">{{ row.action }}</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Recent Interview Reports</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>User</th>
+                  <th>Interview Type</th>
+                  <th>Score</th>
+                  <th>Report</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of dashboard.recentInterviewReports">
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.user }}</td>
+                  <td>{{ row.interviewType }}</td>
+                  <td>{{ row.score }}</td>
+                  <td><span class="report-pill">{{ row.report }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="right-column">
+        <article class="card">
+          <h2>System Summary</h2>
+          <div class="summary-list">
+            <div class="summary-row" *ngFor="let row of dashboard.systemSummary">
+              <span>{{ row.label }}</span>
+              <span [class]="getSummaryToneClass(row)">{{ row.value }}</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Performance Overview</h2>
+          <div class="performance-row" *ngFor="let row of dashboard.performanceOverview">
+            <p>{{ row.label }}</p>
+            <div class="performance-track">
+              <span class="performance-fill" [style.width]="getBarWidth(row)"></span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Admin Actions</h2>
+          <div class="actions-row">
+            <button
+              type="button"
+              *ngFor="let action of dashboard.adminActions"
+              [class]="getActionClass(action)"
+              (click)="onAdminAction(action)"
+            >
+              {{ action.label }}
+            </button>
+          </div>
+        </article>
+      </section>
+    </section>
+  </section>
+</main>
