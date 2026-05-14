@@ -20,6 +20,7 @@
       <p class="state-message error" *ngIf="state === 'error' && errorMessage">
         {{ errorMessage }}
       </p>
+
       <div class="state-message" *ngIf="state === 'loading'">
         <app-loader label="Starting interview session..." [centered]="false"></app-loader>
       </div>
@@ -27,11 +28,7 @@
       <div class="setup-grid">
         <label>
           Career field
-          <select
-            [(ngModel)]="setupModel.careerField"
-            name="careerField"
-            [disabled]="state === 'loading'"
-          >
+          <select [(ngModel)]="setupModel.careerField" name="careerField" [disabled]="state === 'loading'">
             <option *ngFor="let option of careerFieldOptions" [ngValue]="option">
               {{ option }}
             </option>
@@ -40,11 +37,7 @@
 
         <label>
           Interview type
-          <select
-            [(ngModel)]="setupModel.interviewType"
-            name="interviewType"
-            [disabled]="state === 'loading'"
-          >
+          <select [(ngModel)]="setupModel.interviewType" name="interviewType" [disabled]="state === 'loading'">
             <option *ngFor="let option of interviewTypeOptions" [ngValue]="option">
               {{ option }}
             </option>
@@ -53,11 +46,7 @@
 
         <label>
           Difficulty
-          <select
-            [(ngModel)]="setupModel.difficulty"
-            name="difficulty"
-            [disabled]="state === 'loading'"
-          >
+          <select [(ngModel)]="setupModel.difficulty" name="difficulty" [disabled]="state === 'loading'">
             <option *ngFor="let option of difficultyOptions" [ngValue]="option">
               {{ option }}
             </option>
@@ -66,11 +55,7 @@
 
         <label>
           Number of questions
-          <select
-            [(ngModel)]="setupModel.questionCount"
-            name="questionCount"
-            [disabled]="state === 'loading'"
-          >
+          <select [(ngModel)]="setupModel.questionCount" name="questionCount" [disabled]="state === 'loading'">
             <option *ngFor="let count of questionCountOptions" [ngValue]="count">
               {{ count }}
             </option>
@@ -117,9 +102,6 @@
       <p class="state-message error" *ngIf="state === 'error' && errorMessage">
         {{ errorMessage }}
       </p>
-      <div class="state-message" *ngIf="state === 'loading'">
-        <app-loader label="Processing interview request..." [centered]="false"></app-loader>
-      </div>
 
       <section class="workspace-grid">
         <article class="panel live-interview">
@@ -151,22 +133,26 @@
 
           <section class="input-area">
             <div class="input-row">
-              <button type="button" class="mic-btn" [disabled]="isBusy || state === 'completed'">
-                🎤
+              <button
+                type="button"
+                class="mic-btn"
+                (click)="toggleVoiceInput()"
+                [disabled]="isBusy || state === 'completed' || !currentQuestion"
+              >
+                {{ isListening ? "🛑" : "🎤" }}
               </button>
 
-              <input
-                type="text"
-                [value]="userAnswer"
-                (input)="onAnswerInput($event)"
-                (keyup.enter)="sendAnswer()"
-                placeholder="Type your answer here..."
+              <textarea
+                [(ngModel)]="userAnswer"
+                name="userAnswer"
+                placeholder="Type or speak your answer here..."
+                rows="2"
                 [disabled]="isBusy || state === 'completed' || !currentQuestion"
-              />
+              ></textarea>
 
               <button
                 type="button"
-                class="btn btn-primary send-btn"
+                class="send-btn"
                 (click)="sendAnswer()"
                 [disabled]="isBusy || state === 'completed' || !currentQuestion || !userAnswer.trim()"
               >
@@ -183,6 +169,7 @@
               >
                 {{ isPaused ? "Resume" : "Pause" }}
               </button>
+
               <button
                 type="button"
                 class="btn btn-success"
@@ -191,6 +178,7 @@
               >
                 Next Question
               </button>
+
               <button
                 type="button"
                 class="btn btn-danger"
@@ -202,8 +190,15 @@
             </div>
 
             <div class="completion-row" *ngIf="state === 'completed'">
-              <p>{{ completionSummary || "Interview finished. You can start another session." }}</p>
-              <button type="button" class="btn btn-primary" (click)="resetToSetup()">
+              <p>
+                {{ completionSummary || "Interview finished. You can start another session." }}
+              </p>
+
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="resetToSetup()"
+              >
                 Start New Interview
               </button>
             </div>
@@ -225,14 +220,17 @@
               <span>Clarity</span>
               <span class="metric-badge">{{ evaluation.clarity }}</span>
             </div>
+
             <div class="metric-row">
               <span>Technical Accuracy</span>
               <span class="metric-badge">{{ evaluation.technicalAccuracy }}</span>
             </div>
+
             <div class="metric-row">
               <span>Confidence</span>
               <span class="metric-badge">{{ evaluation.confidence }}</span>
             </div>
+
             <div class="metric-row">
               <span>Communication</span>
               <span class="metric-badge">{{ evaluation.communication }}</span>

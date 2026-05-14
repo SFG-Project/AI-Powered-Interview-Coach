@@ -8,16 +8,16 @@ const FALLBACK_USER_ID = "anonymous";
 require("dotenv").config();
 
 const ALLOWED_CAREER_FIELDS = [
-    "Software Development",
-    "Finance",
-    "Healthcare",
-    "Education",
-    "Marketing",
-    "Engineering",
-    "Human Resources",
-    "Sales",
-    "Customer Support",
-    "Other",
+  "Software Development",
+  "Finance",
+  "Healthcare",
+  "Education",
+  "Marketing",
+  "Engineering",
+  "Human Resources",
+  "Sales",
+  "Customer Support",
+  "Other",
 ];
 
 const ALLOWED_INTERVIEW_TYPES = ["Technical", "Behavioural", "HR", "Mixed"];
@@ -258,10 +258,10 @@ function calculateSessionSummary(session) {
 
   const averageScore = scoredQuestions.length
     ? Number(
-        (scoredQuestions.reduce((sum, score) => sum + score, 0) / scoredQuestions.length).toFixed(
-          1
-        )
+      (scoredQuestions.reduce((sum, score) => sum + score, 0) / scoredQuestions.length).toFixed(
+        1
       )
+    )
     : 0;
 
   return {
@@ -613,7 +613,7 @@ function normalizeFeedback(payload, skipped = false) {
       : fallback.improvements,
     suggestedAnswer:
       typeof payload?.suggestedAnswer === "string" &&
-      payload.suggestedAnswer.trim()
+        payload.suggestedAnswer.trim()
         ? payload.suggestedAnswer.trim()
         : fallback.suggestedAnswer,
   };
@@ -722,8 +722,8 @@ async function evaluateAnswerWithAi({ session, question, answer, skipped }) {
       role: "user",
       content: JSON.stringify({
         task: "evaluate_interview_answer",
-       instructions:
-  `
+        instructions:
+          `
 Return STRICT JSON only.
 
 You are an experienced technical interview evaluator.
@@ -806,7 +806,7 @@ suggestedAnswer:
 Do not include markdown.
 Do not include explanations outside JSON.
 Do not wrap JSON in triple backticks.
-`,        sessionContext: {
+`, sessionContext: {
           careerField: session.careerField,
           interviewType: session.interviewType,
           difficulty: session.difficulty,
